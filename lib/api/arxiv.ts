@@ -95,6 +95,7 @@ function entryToPaper(entry: ArxivEntry): Paper {
     abstract: cleanHtml(entry.summary.replace(/\s+/g, ' ').trim()),
     date: entry.published,
     source: 'arxiv',
+    publicationType: 'Preprint',
     externalIds: {
       arxivId,
       doi: extractDoi(entry['arxiv:doi']),
@@ -109,14 +110,18 @@ function entryToPaper(entry: ArxivEntry): Paper {
   };
 }
 
-function buildQuery(query: string, start: number, max: number, sortBy: string, sortOrder: string): string {
+function buildQuery(query: string, start: number, max: number, sortBy: string, sortOrder: string, dateRange?: { from: string; to: string }): string {
   const params = new URLSearchParams({
-    search_query: `all:${query}`,
+    search_query: query.trim() ? `all:${query}` : `submittedDate:[200001010000 TO ${new Date().toISOString().slice(0, 10).replaceAll('-', '')}2359]`,
     start: String(start),
     max_results: String(max),
     sortBy,
     sortOrder,
   });
+  if (dateRange) {
+    const range = `submittedDate:[${dateRange.from.replaceAll('-', '')}0000 TO ${dateRange.to.replaceAll('-', '')}2359]`;
+    params.set('search_query', query.trim() ? `(all:${query}) AND ${range}` : range);
+  }
   return `${ARXIV_API_BASE}?${params}`;
 }
 
@@ -127,12 +132,13 @@ export async function searchArxiv(
     maxResults?: number;
     sortBy?: 'relevance' | 'lastUpdatedDate' | 'submittedDate';
     sortOrder?: 'ascending' | 'descending';
+    dateRange?: { from: string; to: string };
   } = {}
 ): Promise<{ papers: Paper[]; total: number }> {
-  const { start = 0, maxResults = 20, sortBy = 'relevance', sortOrder = 'descending' } = options;
+  const { start = 0, maxResults = 20, sortBy = query.trim() ? 'relevance' : 'submittedDate', sortOrder = 'descending' } = options;
   await rateLimit();
 
-  const url = buildQuery(query, start, Math.min(maxResults, 100), sortBy, sortOrder);
+  const url = buildQuery(query, start, Math.min(maxResults, 100), sortBy, sortOrder, options.dateRange);
   const response = await httpGet<string>(url, {
     headers: { Accept: 'application/atom+xml' },
     responseType: 'text',

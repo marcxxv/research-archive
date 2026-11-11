@@ -1,6 +1,8 @@
 'use client';
 
 import { useEffect, useMemo, useState, useCallback, Suspense } from 'react';
+import Link from 'next/link';
+import disciplines from '@/data/disciplines.json';
 import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 import SearchBar from '@/components/SearchBar';
 import PaperCard from '@/components/PaperCard';
@@ -31,14 +33,17 @@ function getDateRange(range: FilterState['dateRange']): { from: string; to: stri
 }
 
 function paramsToFilters(sp: URLSearchParams): FilterState {
-  const sources = sp.get('sources')?.split(',').filter(Boolean) as PaperSource[] | undefined;
+  const validSources = new Set(defaultFilters.sources);
+  const sources = sp.get('sources')?.split(',').filter((s): s is PaperSource => validSources.has(s as PaperSource));
+  const range = sp.get('range');
+  const sort = sp.get('sort');
   return {
-    sources: sources?.length ? sources : defaultFilters.sources,
-    accessType: (sp.get('access') as 'open' | 'any') || defaultFilters.accessType,
-    dateRange: (sp.get('range') as FilterState['dateRange']) || defaultFilters.dateRange,
-    citationMin: parseInt(sp.get('citationMin') || '0', 10) || 0,
-    discipline: sp.get('discipline') || '',
-    sort: (sp.get('sort') as SortOption) || defaultFilters.sort,
+    sources: sources?.length ? [...new Set(sources)] : defaultFilters.sources,
+    accessType: sp.get('access') === 'open' ? 'open' : 'any',
+    dateRange: range === 'week' || range === 'month' || range === 'year' ? range : 'all',
+    citationMin: Math.max(0, parseInt(sp.get('citationMin') || '0', 10) || 0),
+    discipline: disciplines.some(d => d.id === sp.get('discipline')) ? sp.get('discipline')! : '',
+    sort: sort === 'date' || sort === 'citations' || sort === 'relevance' ? sort : sp.get('q')?.trim() ? 'relevance' : 'date',
   };
 }
 
@@ -68,7 +73,8 @@ function SearchContent() {
   const filters = useMemo(() => paramsToFilters(searchParams), [searchParams]);
 
   const [results, setResults] = useState<SearchResult | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [retry, setRetry] = useState(0);
   const [error, setError] = useState('');
   const [lastQuery, setLastQuery] = useState(query);
   const savedIds = useSavedIds();
@@ -82,7 +88,6 @@ function SearchContent() {
   }
 
   useEffect(() => {
-    if (!query.trim()) return;
     let cancelled = false;
     const controller = new AbortController();
 
@@ -133,7 +138,7 @@ function SearchContent() {
       cancelled = true;
       controller.abort();
     };
-  }, [query, page, filters]);
+  }, [query, page, filters, retry]);
 
   const updateUrl = useCallback(
     (nextQuery: string, nextPage: number, nextFilters: FilterState, options: { scrollTop?: boolean } = {}) => {
@@ -157,9 +162,13 @@ function SearchContent() {
   const showInitialSkeleton = isLoading && !results;
 
   return (
-    <div className="page">
+    <div className="page search-page">
       <div className="wrap">
-        <h1 className="sr-only">Search papers</h1>
+        <div className="search-page__heading">
+          <div><h1>{query ? 'Search results' : 'Discover research'}</h1>
+          <p>{query ? `Papers matching “${query}”` : 'A fresh starting point, drawn from four scholarly catalogs.'}</p></div>
+          <Link href="/saved" className="text-action">Open your library →</Link>
+        </div>
 
         <div className="search-top">
           <SearchBar
@@ -172,15 +181,16 @@ function SearchContent() {
         </div>
 
         <div className="results-grid">
-          <FilterSidebar filters={filters} onChange={handleFilterChange} onReset={handleResetFilters} />
+          <FilterSidebar filters={filters} onChange={handleFilterChange} onReset={handleResetFilters} sourcesQueried={results?.sourcesQueried} errors={results?.errors} loading={isLoading} />
 
-          <div className="results-main">
+          <div className="results-main" aria-busy={isLoading}>
+            <h2 className="results-heading">{query ? 'Matching papers' : 'Recent papers'}</h2>
             <div className="toolbar">
               <p className="toolbar__count" aria-live="polite">
                 {results && !showInitialSkeleton ? (
                   <>
-                    <b>{results.total.toLocaleString()}</b> papers
-                    <span className="muted"> · {results.searchTimeMs} ms</span>
+                    <b>{results.papers.length}</b> papers shown
+                    <span className="muted"> · {results.sourcesQueried.length - (results.errors?.length || 0)} of {results.sourcesQueried.length} catalogs responded</span>
                   </>
                 ) : (
                   <span className="muted">{isLoading ? 'Searching selected databases…' : query ? 'No results loaded' : 'Ready to search'}</span>
@@ -188,7 +198,7 @@ function SearchContent() {
               </p>
 
               <div className="segmented" role="group" aria-label="Sort results">
-                {SORTS.map(opt => (
+                {SORTS.filter(opt => query.trim() || opt.value !== 'relevance').map(opt => (
                   <button
                     key={opt.value}
                     type="button"
@@ -203,16 +213,15 @@ function SearchContent() {
 
             {results?.errors && results.errors.length > 0 && (
               <p className="t-small muted" style={{ marginTop: 12 }}>
-                Partial results: {results.errors.map(e => e.source).join(', ')} did not answer.
+                {results.errors.length === results.sourcesQueried.length ? 'The catalogs are unavailable right now.' : 'Some catalogs did not respond. Available results are shown.'} {results.errors.map(e => e.source).join(', ')}. <button type="button" className="text-action" onClick={() => setRetry(r => r + 1)}>Retry sources</button>
               </p>
             )}
 
             {error && (
               <div className="panel" style={{ marginTop: 24, borderColor: 'var(--line-strong)' }}>
                 <p className="t-small strong">{error}</p>
-                <p className="t-small muted" style={{ marginTop: 6 }}>
-                  Try again in a moment, or remove a filter.
-                </p>
+                <p className="t-small muted" style={{ marginTop: 6 }}>Try again in a moment, or remove a filter.</p>
+                <button type="button" className="btn btn--secondary btn--sm" onClick={() => setRetry(r => r + 1)}>Try again</button>
               </div>
             )}
 
@@ -232,7 +241,7 @@ function SearchContent() {
 
             {!showInitialSkeleton && results && results.papers.length === 0 && (
               <div className="empty">
-                <h2 className="t-h3">Nothing came back for &ldquo;{query}&rdquo;</h2>
+                <h2 className="t-h3">{query ? `No papers found for “${query}”` : 'No recent papers match these filters'}</h2>
                 <p className="t-small muted">
                   Fewer filters, a broader phrase, or a check on the spelling usually fixes it. The
                   indexes hold titles and abstracts, not full text.
@@ -245,14 +254,6 @@ function SearchContent() {
               </div>
             )}
 
-            {!query && !isLoading && (
-              <div className="empty">
-                <h2 className="t-h3">Type a topic, an author or a DOI</h2>
-                <p className="t-small muted">
-                  Or open a field from the homepage and refine it here.
-                </p>
-              </div>
-            )}
 
             {results && results.pages > 1 && (
               <div className="results-pager">

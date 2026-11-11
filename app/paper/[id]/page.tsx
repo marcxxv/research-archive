@@ -235,7 +235,7 @@ export default function PaperPage({ params }: { params: Promise<{ id: string }> 
                 )}
                 <div>
                   <dt>Access</dt>
-                  <dd>{paper.accessType === 'open' ? 'Open access' : 'Paywalled'}</dd>
+                  <dd>{paper.accessType === 'open' ? 'Open access' : 'Check at source'}</dd>
                 </div>
                 {paper.externalIds.doi && (
                   <div>

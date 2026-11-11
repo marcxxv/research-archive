@@ -15,8 +15,9 @@ export default function Badges({ paper }: BadgesProps) {
   return (
     <>
       <span className="badge">{SOURCE_LABEL[paper.source]}</span>
+      {paper.publicationType && <span className="badge paper-kind">{paper.publicationType}</span>}
       <span className={`badge ${paper.accessType === 'open' ? 'badge--open' : 'badge--restricted'}`}>
-        {paper.accessType === 'open' ? 'Open access' : 'Paywalled'}
+        {paper.accessType === 'open' ? 'Open access' : 'Check full text'}
       </span>
     </>
   );

@@ -34,7 +34,7 @@ research-archive/
 │   │   ├── trending/route.ts   # GET trending papers
 │   │   ├── papers/[id]/route.ts# GET paper details + related/citing
 │   │   ├── cite/route.ts       # POST citation formatter
-│   │   └── health/route.ts     # GET source health snapshot
+│   │   └── health/route.ts     # GET source live adapter health
 │   ├── search/page.tsx         # Search results (URL-synced filters)
 │   ├── paper/[id]/page.tsx     # Paper detail (abstract, related, citations)
 │   └── saved/page.tsx          # Local library with import/export
@@ -118,7 +118,7 @@ Source-specific notes:
 
 `unifiedSearch(request)` is the single entry point used by `/api/search`:
 
-1. Validates input via `SearchRequestSchema`
+1. Validates input via `SearchRequestSchema`; a blank query means newest-first discovery
 2. Resolves the discipline filter via `data/disciplines.json` (each entry has a `query` string)
 3. Computes a per-source result count (with floor/cap)
 4. Calls each enabled source in parallel
@@ -311,3 +311,9 @@ Types: `feat`, `fix`, `refactor`, `style`, `docs`, `chore`, `perf`, `test`.
 **Last updated**: November 11, 2026
 **Branch**: verify with `git branch --show-current`
 **Status**: verify current lint, build and browser results before release.
+
+## Discovery verification
+
+`components/DiscoveryPreview.tsx` uses the search API with a blank query and date sort. The search page shares that API and automatically loads records before typing. `lib/search-normalization.ts` owns cross-catalog DOI/title merging. The health route probes actual source adapters and is dynamic.
+
+Run `node scripts/verify-search-normalization.mjs` for pure merging regression checks and `node scripts/verify-sources.mjs <running-app-url>` for real source search/recent/detail/health verification. A provider may be slow but functional; preserve that distinction.

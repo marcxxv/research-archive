@@ -102,6 +102,7 @@ function workToPaper(work: OpenAlexWork): Paper {
     abstract: cleanHtml(reconstructAbstract(work.abstract_inverted_index)),
     date: work.publication_date || (work.publication_year ? `${work.publication_year}-01-01` : ''),
     source: 'openalex',
+    publicationType: work.type?.replaceAll('-', ' '),
     externalIds: { openAlexId, doi, pmid },
     citations: work.cited_by_count || 0,
     accessType: work.open_access?.is_oa || work.is_oa ? 'open' : 'restricted',
@@ -116,7 +117,7 @@ function workToPaper(work: OpenAlexWork): Paper {
 const SELECT_FIELDS = [
   'id', 'doi', 'title', 'display_name', 'publication_date', 'publication_year',
   'authorships', 'abstract_inverted_index', 'cited_by_count', 'fwci',
-  'is_oa', 'open_access', 'primary_location', 'best_oa_location',
+  'open_access', 'primary_location', 'best_oa_location',
   'topics', 'primary_topic', 'concepts', 'ids', 'type',
 ].join(',');
 
@@ -136,17 +137,17 @@ export async function searchOpenAlex(
     };
   } = {}
 ): Promise<{ papers: Paper[]; total: number }> {
-  const { page = 1, perPage = 20, sort = 'relevance_score', order = 'desc', filter } = options;
+  const { page = 1, perPage = 20, sort = query.trim() ? 'relevance_score' : 'publication_date', order = 'desc', filter } = options;
 
   const params = new URLSearchParams({
-    search: query,
+    ...(query.trim() ? { search: query } : {}),
     page: String(page),
     per_page: String(Math.min(perPage, 200)),
     sort: `${sort}:${order}`,
     select: SELECT_FIELDS,
   });
 
-  const filters: string[] = [];
+  const filters: string[] = ['is_paratext:false', 'is_retracted:false'];
   if (filter?.fromDate) filters.push(`from_publication_date:${filter.fromDate}`);
   if (filter?.toDate) filters.push(`to_publication_date:${filter.toDate}`);
   if (filter?.isOa !== undefined) filters.push(`is_oa:${filter.isOa}`);

@@ -56,6 +56,7 @@ interface PubMedArticle {
         JournalIssue?: { PubDate?: PubMedDate };
       };
       ArticleDate?: PubMedDate | PubMedDate[];
+      PublicationTypeList?: { PublicationType?: string | { '#text': string } | (string | { '#text': string })[] };
       ELocationID?:
         | { '#text': string; '@_EIdType': string }
         | { '#text': string; '@_EIdType': string }[];
@@ -146,6 +147,9 @@ function articleToPaper(article: PubMedArticle, citations: number = 0): Paper {
     }
   }
 
+  const pmcId = articleIds ? (Array.isArray(articleIds) ? articleIds : [articleIds]).find(id => id['@_IdType'] === 'pmc')?.['#text'] : undefined;
+  const rawType = citation.Article.PublicationTypeList?.PublicationType;
+  const typeList = rawType ? (Array.isArray(rawType) ? rawType : [rawType]).map(pickText) : [];
   const authorRaw = citation.Article.AuthorList?.Author;
   const authors = authorRaw
     ? (Array.isArray(authorRaw) ? authorRaw : [authorRaw])
@@ -189,11 +193,12 @@ function articleToPaper(article: PubMedArticle, citations: number = 0): Paper {
     abstract: cleanHtml(abstract),
     date: pickPubDate(article),
     source: 'pubmed',
+    publicationType: typeList.find(t => /review|trial|meta-analysis/i.test(t)) || typeList[0] || 'Article',
     externalIds: { pmid, doi },
     citations,
-    accessType: 'open',
+    accessType: pmcId ? 'open' : 'restricted',
     url: `https://pubmed.ncbi.nlm.nih.gov/${pmid}/`,
-    pdfUrl: doi ? `https://doi.org/${doi}` : undefined,
+    pdfUrl: pmcId ? `https://pmc.ncbi.nlm.nih.gov/articles/${pmcId}/pdf/` : undefined,
     journal: citation.Article.Journal?.Title || citation.Article.Journal?.ISOAbbreviation,
     keywords: [...new Set([...userKeywords, ...meshKeywords])].slice(0, 10),
     discipline: 'Medicine',
@@ -208,7 +213,8 @@ function appendApiKey(params: URLSearchParams): URLSearchParams {
 async function searchPubMedIds(
   query: string,
   retstart: number,
-  retmax: number
+  retmax: number,
+  sort: 'relevance' | 'pub date'
 ): Promise<{ ids: string[]; total: number }> {
   const params = appendApiKey(
     new URLSearchParams({
@@ -217,7 +223,7 @@ async function searchPubMedIds(
       retstart: String(retstart),
       retmax: String(retmax),
       retmode: 'json',
-      sort: 'relevance',
+      sort,
     })
   );
 
@@ -269,13 +275,14 @@ async function fetchCitationCounts(ids: string[]): Promise<Map<string, number>> 
 
 export async function searchPubMed(
   query: string,
-  options: { start?: number; maxResults?: number } = {}
+  options: { start?: number; maxResults?: number; sort?: 'relevance' | 'pub date'; enrichCitations?: boolean } = {}
 ): Promise<{ papers: Paper[]; total: number }> {
-  const { start = 0, maxResults = 20 } = options;
-  const { ids, total } = await searchPubMedIds(query, start, maxResults);
+  const { start = 0, maxResults = 20, sort = query.trim() ? 'relevance' : 'pub date', enrichCitations = true } = options;
+  const term = query.trim() || `2000:${new Date().toISOString().slice(0, 10).replaceAll('-', '/')}[dp]`;
+  const { ids, total } = await searchPubMedIds(term, start, maxResults, sort);
   if (ids.length === 0) return { papers: [], total: 0 };
 
-  const [articles, citations] = await Promise.all([fetchPubMedArticles(ids), fetchCitationCounts(ids)]);
+  const [articles, citations] = await Promise.all([fetchPubMedArticles(ids), enrichCitations ? fetchCitationCounts(ids) : Promise.resolve(new Map<string, number>())]);
   const papers = articles.map(article => {
     const pmid = typeof article.MedlineCitation.PMID === 'string'
       ? article.MedlineCitation.PMID

@@ -1,0 +1,21 @@
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import ts from 'typescript';
+// Compile the real pure module; no mock copy of its algorithm is tested.
+const source = readFileSync(new URL('../lib/search-normalization.ts', import.meta.url), 'utf8');
+const { outputText } = ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ES2022 } });
+const { deduplicatePapers } = await import(`data:text/javascript;base64,${Buffer.from(outputText).toString('base64')}`);
+const paper = { id: 'arxiv:77', title: 'A useful study of reliable academic discovery', authors: [], abstract: '', date: '2026-11-11', source: 'arxiv', externalIds: {}, citations: 0, accessType: 'restricted', url: 'https://example.org' };
+let items = deduplicatePapers([paper, { ...paper, id: 'crossref:77', source: 'crossref', externalIds: { doi: '10.77/example' }, abstract: 'The fuller abstract', citations: 77, accessType: 'open' }]);
+assert.equal(items.length, 1, 'A DOI-less preprint and its DOI record merge by title');
+assert.equal(items[0].externalIds.doi, '10.77/example');
+assert.equal(items[0].abstract, 'The fuller abstract');
+assert.equal(items[0].citations, 77);
+assert.equal(items[0].accessType, 'open');
+items = deduplicatePapers([{ ...paper, externalIds: { doi: 'https://doi.org/10.77/EXAMPLE' } }, { ...paper, id: 'other', externalIds: { doi: '10.77/example' } }]);
+assert.equal(items.length, 1, 'DOI URL prefixes and case do not create duplicates');
+items = deduplicatePapers([{ ...paper, externalIds: { doi: '10.77/a' } }, { ...paper, externalIds: { doi: '10.77/b' } }]);
+assert.equal(items.length, 2, 'Distinct DOIs with the same title remain separate works');
+items = deduplicatePapers([{ ...paper, title: '研究 — A Study of Academic Discovery' }, { ...paper, title: '研究: A Study of Academic Discovery', id: 'other' }]);
+assert.equal(items.length, 1, 'Unicode titles and punctuation normalize without losing their letters');
+console.log('PASS: DOI/title matching, metadata preservation, distinct records, Unicode titles');

@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useState } from 'react';
 import type { Paper } from '@/lib/types';
-import { formatAuthors, formatNumber, truncateText } from '@/lib/utils';
+import { formatAuthors, formatNumber, formatDate } from '@/lib/utils';
 import Badges from './Badges';
 import Citation from './Citation';
 
@@ -16,6 +16,7 @@ interface PaperCardProps {
 
 export default function PaperCard({ paper, onSave, isSaved = false, variant = 'row' }: PaperCardProps) {
   const [showCitation, setShowCitation] = useState(false);
+  const [expanded, setExpanded] = useState(false);
   const year = paper.date ? new Date(paper.date).getFullYear() : null;
 
   const saveButton = onSave ? (
@@ -56,7 +57,7 @@ export default function PaperCard({ paper, onSave, isSaved = false, variant = 'r
       <div className="result__top">
         <Badges paper={paper} />
         <span className="t-mono muted">
-          {year ?? 'Undated'}
+          {paper.date ? formatDate(paper.date) : 'Undated'}
           {paper.citations > 0 ? ` · ${formatNumber(paper.citations)} cited` : ''}
         </span>
       </div>
@@ -69,7 +70,7 @@ export default function PaperCard({ paper, onSave, isSaved = false, variant = 'r
         <p className="result__authors">{formatAuthors(paper.authors, 4)}</p>
       )}
 
-      {paper.abstract && <p className="result__abstract">{truncateText(paper.abstract, 320)}</p>}
+      {paper.abstract ? <div><p className={`result__abstract${expanded ? ' is-expanded' : ''}`}>{paper.abstract}</p>{paper.abstract.length > 240 && <button className="result__expand" type="button" onClick={() => setExpanded(v => !v)} aria-expanded={expanded}>{expanded ? 'Less' : 'Read abstract'}</button>}</div> : <p className="result__no-abstract">Abstract not supplied by this catalog.</p>}
 
       <div className="result__foot">
         <span className="t-small muted">{paper.journal}</span>
@@ -77,16 +78,18 @@ export default function PaperCard({ paper, onSave, isSaved = false, variant = 'r
           <button
             type="button"
             onClick={() => setShowCitation(v => !v)}
-            className={`icon-btn${showCitation ? ' is-on' : ''}`}
+            className={`result__cite${showCitation ? ' is-on' : ''}`}
             aria-expanded={showCitation}
             aria-label={showCitation ? 'Hide citation' : 'Show citation'}
             title="Cite this paper"
           >
+            <span>Cite</span>
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <path d="M9.5 6C7 7.4 5.5 9.9 5.5 13v5h5v-6h-3c0-2 .6-3.2 2-4.2z" />
               <path d="M19 6c-2.5 1.4-4 3.9-4 7v5h5v-6h-3c0-2 .6-3.2 2-4.2z" />
             </svg>
           </button>
+          <a href={paper.url} className="text-action" target="_blank" rel="noopener noreferrer">Open paper ↗</a>
           {saveButton}
           {paper.pdfUrl && (
             <a

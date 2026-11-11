@@ -6,6 +6,7 @@ import { searchCrossRef } from '@/lib/api/crossref';
 import { searchOpenAlex, getTrendingPapers } from '@/lib/api/openalex';
 import { searchCache, getSearchCacheKey, maybeCleanupCache } from '@/lib/cache';
 import disciplines from '@/data/disciplines.json';
+import { deduplicatePapers } from '@/lib/search-normalization';
 
 const SOURCE_LIMIT_FLOOR = 6;
 const SOURCE_LIMIT_CAP = 25;
@@ -31,65 +32,6 @@ function disciplineToQuery(disciplineId?: string): string | null {
   return found?.query || null;
 }
 
-function paperScore(paper: Paper): number {
-  const abstractScore = (paper.abstract?.length || 0) / 50;
-  const authorScore = paper.authors.length * 4;
-  const citationScore = Math.log10((paper.citations || 0) + 1) * 8;
-  return abstractScore + authorScore + citationScore;
-}
-
-function mergePapers(into: Paper, from: Paper): Paper {
-  return {
-    ...into,
-    abstract: into.abstract.length >= from.abstract.length ? into.abstract : from.abstract,
-    authors: into.authors.length >= from.authors.length ? into.authors : from.authors,
-    citations: Math.max(into.citations, from.citations),
-    pdfUrl: into.pdfUrl || from.pdfUrl,
-    journal: into.journal || from.journal,
-    discipline: into.discipline || from.discipline,
-    keywords: into.keywords?.length ? into.keywords : from.keywords,
-    accessType: into.accessType === 'open' || from.accessType === 'open' ? 'open' : into.accessType,
-    externalIds: { ...from.externalIds, ...into.externalIds },
-  };
-}
-
-function deduplicatePapers(papers: Paper[]): Paper[] {
-  const byDoi = new Map<string, Paper>();
-  const byTitle = new Map<string, Paper>();
-  const orphans: Paper[] = [];
-
-  const titleKey = (title: string) => title.toLowerCase().replace(/\s+/g, ' ').replace(/[^\w\s]/g, '').trim();
-
-  for (const paper of papers) {
-    const doi = paper.externalIds.doi?.toLowerCase();
-    if (doi) {
-      const existing = byDoi.get(doi);
-      if (existing) {
-        const winner = paperScore(existing) >= paperScore(paper) ? existing : paper;
-        const loser = winner === existing ? paper : existing;
-        byDoi.set(doi, mergePapers(winner, loser));
-      } else {
-        byDoi.set(doi, paper);
-      }
-      continue;
-    }
-    const tk = titleKey(paper.title);
-    if (tk.length > 12) {
-      const existing = byTitle.get(tk);
-      if (existing) {
-        const winner = paperScore(existing) >= paperScore(paper) ? existing : paper;
-        const loser = winner === existing ? paper : existing;
-        byTitle.set(tk, mergePapers(winner, loser));
-        continue;
-      }
-      byTitle.set(tk, paper);
-      continue;
-    }
-    orphans.push(paper);
-  }
-
-  return [...byDoi.values(), ...byTitle.values(), ...orphans];
-}
 
 function sortPapers(papers: Paper[], sortBy: 'relevance' | 'date' | 'citations'): Paper[] {
   const sorted = [...papers];
@@ -139,7 +81,7 @@ function filterPapers(
   }
   if (options.dateRange) {
     const fromDate = new Date(options.dateRange.from);
-    const toDate = new Date(options.dateRange.to);
+    const toDate = new Date(`${options.dateRange.to}T23:59:59.999Z`);
     filtered = filtered.filter(p => {
       if (!p.date) return false;
       const t = new Date(p.date).getTime();
@@ -154,27 +96,30 @@ async function searchSource(
   query: string,
   page: number,
   perSource: number,
+  sort: 'relevance' | 'date' | 'citations',
   filters: { accessType?: 'open' | 'any'; dateRange?: { from: string; to: string }; citationMin?: number }
 ): Promise<SourceResult> {
   const offset = (page - 1) * perSource;
   try {
     switch (source) {
       case 'arxiv': {
-        const result = await searchArxiv(query, { start: offset, maxResults: perSource });
+        const result = await searchArxiv(query, { start: offset, maxResults: perSource, dateRange: filters.dateRange, sortBy: sort === 'date' ? 'submittedDate' : 'relevance' });
         return { source, papers: result.papers, total: result.total };
       }
       case 'pubmed': {
-        const result = await searchPubMed(query, { start: offset, maxResults: perSource });
+        const pubmedQuery = [query && `(${query})`, filters.accessType === 'open' && 'free full text[sb]', filters.dateRange && `${filters.dateRange.from.replaceAll('-', '/')}:${filters.dateRange.to.replaceAll('-', '/')}[dp]`].filter(Boolean).join(' AND ');
+        const result = await searchPubMed(pubmedQuery, { start: offset, maxResults: perSource, sort: sort === 'date' ? 'pub date' : 'relevance' });
         return { source, papers: result.papers, total: result.total };
       }
       case 'crossref': {
         const result = await searchCrossRef(query, {
           offset,
           rows: perSource,
+          sort: sort === 'date' ? 'published' : sort === 'citations' ? 'is-referenced-by-count' : 'score',
           filter: {
             fromDate: filters.dateRange?.from,
             toDate: filters.dateRange?.to,
-            hasAbstract: true,
+            hasAbstract: false,
           },
         });
         return { source, papers: result.papers, total: result.total };
@@ -183,6 +128,7 @@ async function searchSource(
         const result = await searchOpenAlex(query, {
           page,
           perPage: perSource,
+          sort: sort === 'date' ? 'publication_date' : sort === 'citations' ? 'cited_by_count' : 'relevance_score',
           filter: {
             fromDate: filters.dateRange?.from,
             toDate: filters.dateRange?.to,
@@ -208,7 +154,7 @@ export async function unifiedSearch(request: SearchRequest): Promise<SearchResul
 
   const baseQuery = request.query.trim();
   const disciplineQuery = disciplineToQuery(request.discipline);
-  const finalQuery = disciplineQuery ? `${baseQuery} ${disciplineQuery}` : baseQuery;
+  const finalQuery = disciplineQuery ? `${baseQuery} ${disciplineQuery}`.trim() : baseQuery;
 
   const sources: PaperSource[] = (request.sources && request.sources.length > 0)
     ? request.sources
@@ -216,9 +162,9 @@ export async function unifiedSearch(request: SearchRequest): Promise<SearchResul
 
   const page = request.page || 1;
   const limit = request.limit || 20;
-  const sort = request.sort || 'relevance';
+  const sort = baseQuery ? (request.sort || 'relevance') : (request.sort === 'citations' ? 'citations' : 'date');
 
-  const cacheKey = getSearchCacheKey(finalQuery, {
+  const cacheKey = 'discovery-v2:' + getSearchCacheKey(finalQuery, {
     sources, page, limit, sort,
     accessType: request.accessType,
     citationMin: request.citationMin,
@@ -233,12 +179,12 @@ export async function unifiedSearch(request: SearchRequest): Promise<SearchResul
   const perSource = perSourceLimit(limit, sources.length);
   const filters = {
     accessType: request.accessType,
-    dateRange: request.dateRange,
+    dateRange: request.dateRange || (!baseQuery ? { from: '2000-01-01', to: new Date().toISOString().slice(0, 10) } : undefined),
     citationMin: request.citationMin,
   };
 
   const results = await Promise.all(
-    sources.map(source => searchSource(source, finalQuery, page, perSource, filters))
+    sources.map(source => searchSource(source, finalQuery, page, perSource, sort, filters))
   );
 
   let allPapers: Paper[] = [];
@@ -266,7 +212,7 @@ export async function unifiedSearch(request: SearchRequest): Promise<SearchResul
     errors: errors.length ? errors : undefined,
   };
 
-  searchCache.set(cacheKey, result, 15 * 60 * 1000);
+  searchCache.set(cacheKey, result, errors.length ? 15 * 1000 : 15 * 60 * 1000);
   return result;
 }
 

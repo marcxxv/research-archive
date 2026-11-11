@@ -1,74 +1,35 @@
 import { NextResponse } from 'next/server';
-import { httpGet } from '@/lib/http';
+import { searchArxiv } from '@/lib/api/arxiv';
+import { searchPubMed } from '@/lib/api/pubmed';
+import { searchCrossRef } from '@/lib/api/crossref';
+import { searchOpenAlex } from '@/lib/api/openalex';
 import type { HealthCheck } from '@/lib/types';
 
 export const runtime = 'nodejs';
-export const revalidate = 30;
+export const dynamic = 'force-dynamic';
 
-interface SourceHealth {
-  status: 'up' | 'down' | 'slow';
-  latencyMs?: number;
-  lastCheck: string;
-}
-
-async function checkSource(url: string, timeout: number = 5000): Promise<SourceHealth> {
-  const startTime = Date.now();
+async function checkSource(run: () => Promise<{ papers: unknown[] }>) {
+  const start = Date.now();
   try {
-    await httpGet(url, { timeout, retries: 0 });
-    const latencyMs = Date.now() - startTime;
-    return {
-      status: latencyMs > 3000 ? 'slow' : 'up',
-      latencyMs,
-      lastCheck: new Date().toISOString(),
-    };
+    const { papers } = await run();
+    if (!papers.length) throw new Error('Probe returned no usable papers');
+    const latencyMs = Date.now() - start;
+    return { status: latencyMs > 3000 ? 'slow' as const : 'up' as const, latencyMs, lastCheck: new Date().toISOString() };
   } catch {
-    return {
-      status: 'down',
-      latencyMs: Date.now() - startTime,
-      lastCheck: new Date().toISOString(),
-    };
+    return { status: 'down' as const, latencyMs: Date.now() - start, lastCheck: new Date().toISOString() };
   }
 }
 
+// Probe the same parsing and request paths as search, not a simpler URL that can hide a broken adapter.
 export async function GET() {
-  try {
-    const [arxiv, pubmed, crossref, openalex] = await Promise.all([
-      checkSource('https://export.arxiv.org/api/query?search_query=all:test&max_results=1'),
-      checkSource('https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=pubmed&term=test&retmax=1&retmode=json'),
-      checkSource('https://api.crossref.org/v1/works?query=test&rows=1'),
-      checkSource('https://api.openalex.org/works?search=test&per_page=1'),
-    ]);
-
-    const sources = { arxiv, pubmed, crossref, openalex };
-    const statuses = Object.values(sources).map(s => s.status);
-    const upCount = statuses.filter(s => s === 'up').length;
-
-    let overallStatus: 'healthy' | 'degraded' | 'unhealthy';
-    if (upCount === statuses.length) overallStatus = 'healthy';
-    else if (upCount > 0) overallStatus = 'degraded';
-    else overallStatus = 'unhealthy';
-
-    const health: HealthCheck = {
-      status: overallStatus,
-      sources,
-      timestamp: new Date().toISOString(),
-      version: '2.0.0',
-    };
-
-    return NextResponse.json(health, {
-      headers: { 'Cache-Control': 'no-store' },
-    });
-  } catch (error) {
-    console.error('Health check error:', error);
-    return NextResponse.json(
-      {
-        status: 'unhealthy',
-        sources: {},
-        timestamp: new Date().toISOString(),
-        version: '2.0.0',
-        error: error instanceof Error ? error.message : 'Health check failed',
-      },
-      { status: 500 }
-    );
-  }
+  const [arxiv, pubmed, crossref, openalex] = await Promise.all([
+    checkSource(() => searchArxiv('quantum', { maxResults: 1 })),
+    checkSource(() => searchPubMed('cancer', { maxResults: 1, enrichCitations: false })),
+    checkSource(() => searchCrossRef('quantum', { rows: 1 })),
+    checkSource(() => searchOpenAlex('quantum', { perPage: 1 })),
+  ]);
+  const sources = { arxiv, pubmed, crossref, openalex };
+  const working = Object.values(sources).filter(s => s.status !== 'down').length;
+  const health: HealthCheck = { status: working === 4 ? 'healthy' : working > 0 ? 'degraded' : 'unhealthy', sources, timestamp: new Date().toISOString(), version: '2.1.0' };
+  return NextResponse.json(health, { headers: { 'Cache-Control': 'no-store' } });
 }

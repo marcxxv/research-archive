@@ -37,8 +37,7 @@ export async function POST(request: NextRequest) {
 
 export async function GET(request: NextRequest) {
   const sp = request.nextUrl.searchParams;
-  const query = sp.get('q');
-  if (!query) return badRequest('Query parameter "q" is required');
+  const query = sp.get('q') || '';
 
   const sourcesParam = sp.get('sources');
   const sources = sourcesParam

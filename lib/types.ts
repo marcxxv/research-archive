@@ -37,11 +37,12 @@ export const PaperSchema = z.object({
   journal: z.string().optional(),
   keywords: z.array(z.string()).optional(),
   discipline: z.string().optional(),
+  publicationType: z.string().optional(),
 });
 export type Paper = z.infer<typeof PaperSchema>;
 
 export const SearchRequestSchema = z.object({
-  query: z.string().min(1).max(500),
+  query: z.string().trim().max(500).default(''),
   discipline: z.string().optional(),
   dateRange: z
     .object({ from: z.string(), to: z.string() })

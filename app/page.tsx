@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import SearchBar from '@/components/SearchBar';
+import DiscoveryPreview from '@/components/DiscoveryPreview';
 import Citation from '@/components/Citation';
 import type { Paper } from '@/lib/types';
 import sourcesConfig from '@/data/sources-config.json';
@@ -57,7 +58,7 @@ export default function HomePage() {
   return (
     <>
       {/* 1 — the promise, and the product on the first screen */}
-      <section className="hero hero--split" aria-labelledby="hero-h">
+      <section className="hero hero--discover" aria-labelledby="hero-h">
         <div className="wrap">
           <div className="hero-text grid hero__grid">
             <div className="hero__text span-6">
@@ -66,58 +67,18 @@ export default function HomePage() {
               </h1>
 
               <p className="hero__lead">
-                No account needed. Search arXiv, PubMed, CrossRef and OpenAlex together. Their lists merge on
-                DOI and title, so a paper held by three catalogs appears once.
+                Search four scholarly catalogs. Save the papers worth coming back to. No account needed.
               </p>
 
               <div className="hero__search">
                 <SearchBar size="lg" submitLabel="Search papers" placeholder="Topic, author or DOI" />
               </div>
-            </div>
-
-            <div className="hero__media span-6 start-7" data-visual>
-              <div className="win" data-ui>
-                <div className="win__bar">
-                  <span className="win__dots" aria-hidden="true">
-                    <i />
-                    <i />
-                    <i />
-                  </span>
-                  <span className="win__query">
-                    <b>Example: quantum error correction</b>
-                  </span>
-                  <span className="win__sp" />
-                  <span className="win__srcs" aria-hidden="true">
-                    {SOURCE_ORDER.map(id => (
-                      <i key={id} style={{ background: SOURCE_COLOR[id] }} />
-                    ))}
-                  </span>
-                  <span className="win__bar-meta">four sources</span>
-                </div>
-
-                <div className="win__rows">
-                  {DEMO.map(row => (
-                    <div key={row.title} className="win-row">
-                      <div className="win-row__top">
-                        <span className="badge">{row.source}</span>
-                        <span className="t-mono muted">
-                          {row.year} · {row.cites} cited
-                        </span>
-                      </div>
-                      <p className="win-row__t">{row.title}</p>
-                      <p className="win-row__a">{row.authors}</p>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="win__foot">
-                  <span>
-                    Merged from <b>4 of 4</b> catalogs
-                  </span>
-                  <span>Illustrative merged results</span>
-                </div>
+              <div className="hero__topics" aria-label="Try a topic">
+                <span>Explore</span>{['Artificial intelligence', 'Climate', 'Medicine'].map(topic => <Link key={topic} href={`/search?q=${encodeURIComponent(topic)}`}>{topic} ↗</Link>)}
               </div>
             </div>
+
+            <div className="hero__media span-6 start-7"><DiscoveryPreview /></div>
           </div>
         </div>
       </section>

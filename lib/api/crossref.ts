@@ -46,8 +46,8 @@ function formatDateParts(dateParts?: number[][]): string {
 
 function pickDate(work: CrossRefWork): string {
   return (
-    formatDateParts(work['published-print']?.['date-parts']) ||
     formatDateParts(work['published-online']?.['date-parts']) ||
+    formatDateParts(work['published-print']?.['date-parts']) ||
     formatDateParts(work.issued?.['date-parts']) ||
     formatDateParts(work.created?.['date-parts'])
   );
@@ -81,6 +81,7 @@ function workToPaper(work: CrossRefWork): Paper {
     abstract: work.abstract ? cleanHtml(work.abstract) : '',
     date: pickDate(work),
     source: 'crossref',
+    publicationType: work.type?.replaceAll('-', ' '),
     externalIds: { doi: work.DOI },
     citations: work['is-referenced-by-count'] || 0,
     accessType: getAccessType(work),
@@ -102,10 +103,10 @@ export async function searchCrossRef(
     filter?: { fromDate?: string; toDate?: string; hasAbstract?: boolean };
   } = {}
 ): Promise<{ papers: Paper[]; total: number }> {
-  const { offset = 0, rows = 20, sort = 'score', order = 'desc', filter } = options;
+  const { offset = 0, rows = 20, sort = query.trim() ? 'score' : 'published', order = 'desc', filter } = options;
 
   const params = new URLSearchParams({
-    query,
+    ...(query.trim() ? { query } : {}),
     offset: String(offset),
     rows: String(Math.min(rows, 100)),
     sort: sort === 'relevance' ? 'score' : sort,
