@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import PaperCard from '@/components/PaperCard';
 import { useToast } from '@/components/Toast';
-import type { Paper, SavedPaper, CitationFormat } from '@/lib/types';
+import { PaperSchema, type Paper, type SavedPaper, type CitationFormat } from '@/lib/types';
 import { formatDate } from '@/lib/utils';
 import { formatCitations } from '@/lib/citation-formatter';
 import { clearSavedPapers, toggleSavedPaper, useSavedPapers, writeSavedPapers } from '@/lib/saved-papers';
@@ -83,11 +83,18 @@ export default function SavedPage() {
   const handleImport = async (file: File) => {
     try {
       const text = await file.text();
-      const incoming = JSON.parse(text) as SavedPaper[];
-      if (!Array.isArray(incoming)) throw new Error('Invalid file');
+      const raw: unknown = JSON.parse(text);
+      if (!Array.isArray(raw)) throw new Error('Invalid file');
+      const incoming: SavedPaper[] = raw.map(item => {
+        const parsed = PaperSchema.safeParse(item?.paper);
+        if (!parsed.success || typeof item?.savedAt !== 'string' || Number.isNaN(Date.parse(item.savedAt))) {
+          throw new Error('Invalid saved paper');
+        }
+        return { paper: parsed.data, savedAt: item.savedAt };
+      });
       const existingIds = new Set(papers.map(p => p.paper.id));
       const merged = [
-        ...incoming.filter(item => item?.paper?.id && !existingIds.has(item.paper.id)),
+        ...incoming.filter(item => item?.paper?.id && !existingIds.has(item.paper.id) && !!existingIds.add(item.paper.id)),
         ...papers,
       ];
       const newCount = merged.length - papers.length;
@@ -100,103 +107,117 @@ export default function SavedPage() {
 
   if (!mounted) {
     return (
-      <div className="container-app pt-24 pb-16">
-        <div className="space-y-3">
-          {Array.from({ length: 3 }).map((_, i) => (
-            <div key={i} className="h-32 skeleton rounded-[var(--radius-lg)]" />
-          ))}
+      <div className="page">
+        <div className="wrap">
+          <div className="sk" style={{ height: 44, width: 220 }} />
+          <div className="sk" style={{ height: 96, marginTop: 32 }} />
+          <div className="sk" style={{ height: 96, marginTop: 12 }} />
+          <div className="sk" style={{ height: 96, marginTop: 12 }} />
         </div>
       </div>
     );
   }
 
   return (
-    <div className="container-app pt-24 pb-16">
-      <header className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-8">
-        <div>
-          <h1 className="text-title text-[26px] md:text-[32px] tracking-tight mb-1">Library</h1>
-          <p className="text-[13.5px] text-[var(--text-secondary)]">
-            {papers.length} paper{papers.length !== 1 ? 's' : ''} saved · stored locally in your browser
-          </p>
+    <div className="page">
+      <div className="wrap">
+        <div className="page-head">
+          <div>
+            <h1 className="t-h2">Library</h1>
+            <p className="t-small muted" style={{ marginTop: 8 }}>
+              {papers.length} {papers.length === 1 ? 'paper' : 'papers'} saved. Stored in this
+              browser, not on a server.
+            </p>
+          </div>
+          <Link className="btn btn--primary" href="/search">
+            Search papers
+          </Link>
         </div>
+
+        <div style={{ marginBottom: 24 }}>
+              <label className="btn btn--ghost btn--sm" style={{ cursor: 'pointer' }}>
+                Import
+                <input
+                  type="file"
+                  accept="application/json"
+                  className="sr-only"
+                  onChange={e => {
+                    const file = e.target.files?.[0];
+                    if (file) handleImport(file);
+                    e.target.value = '';
+                  }}
+                />
+              </label>
+        </div>
+
         {papers.length > 0 && (
-          <div className="flex flex-wrap gap-1.5">
-            {EXPORTS.map(opt => (
-              <button
-                key={opt.format}
-                onClick={() => handleExport(opt.format, opt.ext, opt.mime)}
-                className="btn btn-sm btn-secondary"
-                type="button"
-              >
-                Export {opt.label}
+          <div className="toolbar">
+            <input
+              type="search"
+              className="input"
+              style={{ maxWidth: 320 }}
+              placeholder="Filter your library"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              aria-label="Filter your library"
+            />
+
+            <div className="toolbar__right">
+              <span className="t-label">Export</span>
+              {EXPORTS.map(opt => (
+                <button
+                  key={opt.format}
+                  type="button"
+                  className="btn btn--ghost btn--sm"
+                  onClick={() => handleExport(opt.format, opt.ext, opt.mime)}
+                >
+                  {opt.label}
+                </button>
+              ))}
+              <button type="button" className="btn btn--ghost btn--sm" onClick={handleExportJson}>
+                JSON
               </button>
-            ))}
-            <button onClick={handleExportJson} className="btn btn-sm btn-secondary" type="button">
-              Export JSON
-            </button>
-            <button onClick={handleClearAll} className="btn btn-sm btn-ghost text-[var(--error)]" type="button">
-              Clear all
-            </button>
+
+
+
+              <button type="button" className="btn btn--ghost btn--sm btn--danger" onClick={handleClearAll}>
+                Clear all
+              </button>
+            </div>
           </div>
         )}
-      </header>
 
-      {papers.length > 0 && (
-        <div className="mb-6 flex items-center gap-3 flex-wrap">
-          <input
-            type="search"
-            placeholder="Filter your library…"
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            className="input max-w-md"
-          />
-          <label className="text-[13px] font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] cursor-pointer transition-colors">
-            <input
-              type="file"
-              accept="application/json"
-              className="hidden"
-              onChange={e => {
-                const file = e.target.files?.[0];
-                if (file) handleImport(file);
-                e.target.value = '';
-              }}
-            />
-            Import JSON
-          </label>
-        </div>
-      )}
-
-      {papers.length === 0 ? (
-        <div className="text-center py-24">
-          <div className="w-12 h-12 mx-auto mb-3 rounded-full bg-[var(--bg-tertiary)] flex items-center justify-center text-[var(--text-tertiary)]">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-              <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
-            </svg>
+        {papers.length === 0 ? (
+          <div className="empty">
+            <h2 className="t-h3">Nothing saved yet</h2>
+            <p className="t-small muted">
+              The bookmark on any result keeps the paper here. No account, no sync, no tracking.
+            </p>
+            <Link href="/search" className="btn btn--secondary btn--sm">
+              Find a paper
+            </Link>
           </div>
-          <h2 className="text-heading text-[16px] mb-1">Your library is empty</h2>
-          <p className="text-[13.5px] text-[var(--text-tertiary)] mb-5">
-            Tap the bookmark icon on any paper to save it here.
-          </p>
-          <Link href="/search" className="btn btn-md btn-primary">Start searching</Link>
-        </div>
-      ) : filtered.length === 0 ? (
-        <div className="text-center py-20">
-          <p className="text-[14px] text-[var(--text-tertiary)]">
-            No saved papers match &ldquo;{search}&rdquo;.
-          </p>
-        </div>
-      ) : (
-        <div className="space-y-3">
-          {filtered.map(sp => (
-            <div key={sp.paper.id}>
-              <PaperCard paper={sp.paper} onSave={handleRemove} isSaved />
-              <p className="text-[11.5px] text-[var(--text-tertiary)] mt-1.5 ml-1">
-                Saved {formatDate(sp.savedAt)}
-              </p>
-            </div>
-          ))}
-        </div>
-      )}
+        ) : filtered.length === 0 ? (
+          <div className="empty">
+            <h2 className="t-h3">No match for &ldquo;{search}&rdquo;</h2>
+            <p className="t-small muted">Titles, authors, journals and keywords are searched.</p>
+            <button type="button" className="btn btn--secondary btn--sm" onClick={() => setSearch('')}>
+              Clear the filter
+            </button>
+          </div>
+        ) : (
+          <div className="results-list">
+            {filtered.map(sp => (
+              <div key={sp.paper.id}>
+                <PaperCard paper={sp.paper} onSave={handleRemove} isSaved />
+                <p className="saved-stamp" style={{ marginTop: 8 }}>
+                  Saved {formatDate(sp.savedAt)}
+                </p>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
 
       <ToastContainer />
     </div>

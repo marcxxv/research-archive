@@ -6,125 +6,112 @@ import { usePathname } from 'next/navigation';
 import { useTheme } from '@/lib/theme';
 
 const NAV_LINKS = [
-  { href: '/search', label: 'Search' },
+  { href: '/#sources', label: 'Sources' },
+  { href: '/#disciplines', label: 'Disciplines' },
   { href: '/saved', label: 'Library' },
 ];
 
 function isActive(pathname: string, href: string): boolean {
-  if (href === '/') return pathname === '/';
-  return pathname === href || pathname.startsWith(href + '/');
+  if (href === '/saved') return pathname.startsWith('/saved');
+  return false;
 }
 
 export default function Header() {
   const pathname = usePathname();
   const { theme, toggle, mounted } = useTheme();
-  const [isScrolled, setIsScrolled] = useState(false);
-  const [isMobileOpen, setIsMobileOpen] = useState(false);
+  const [openPath, setOpenPath] = useState<string | null>(null);
+  const isOpen = openPath === pathname;
 
   useEffect(() => {
-    const onScroll = () => setIsScrolled(window.scrollY > 8);
-    onScroll();
-    window.addEventListener('scroll', onScroll, { passive: true });
-    return () => window.removeEventListener('scroll', onScroll);
-  }, []);
+    if (!isOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpenPath(null);
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [isOpen]);
 
   return (
-    <header
-      className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
-        isScrolled
-          ? 'bg-[var(--bg-primary)]/75 backdrop-blur-xl border-b border-[var(--border-primary)]/60'
-          : 'bg-transparent border-b border-transparent'
-      }`}
-    >
-      <nav className="container-app relative flex items-center justify-between h-16 md:h-[68px]">
-        <Link href="/" className="flex items-center gap-2.5 group" aria-label="ResearchArchive home">
-          <div className="w-8 h-8 rounded-[10px] bg-[var(--text-primary)] text-[var(--bg-primary)] flex items-center justify-center transition-transform group-hover:scale-105">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="11" cy="11" r="8" />
-              <path d="m21 21-4.35-4.35" />
-            </svg>
-          </div>
-          <span className="text-[15px] font-semibold tracking-tight text-[var(--text-primary)]">
-            ResearchArchive
-          </span>
-        </Link>
+    <>
+      <header className="nav">
+        <div className="wrap nav__bar">
+          <a className="skip" href="#main">
+            Skip to content
+          </a>
 
-        <div className="hidden md:flex absolute left-1/2 -translate-x-1/2 items-center gap-1 bg-[var(--bg-elevated)]/60 px-1.5 py-1 rounded-full border border-[var(--border-primary)]/60 backdrop-blur-md">
-          {NAV_LINKS.map(link => {
-            const active = isActive(pathname, link.href);
-            return (
+          <nav className="nav__links" aria-label="Main">
+            {NAV_LINKS.map(link => (
               <Link
                 key={link.href}
                 href={link.href}
-                aria-current={active ? 'page' : undefined}
-                className={`px-3.5 py-1.5 rounded-full text-[13px] font-medium transition-colors ${
-                  active
-                    ? 'text-[var(--text-primary)] bg-[var(--bg-primary)] shadow-sm'
-                    : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]/60'
-                }`}
+                className="nav__link"
+                aria-current={isActive(pathname, link.href) ? 'page' : undefined}
               >
                 {link.label}
               </Link>
-            );
-          })}
-        </div>
+            ))}
+          </nav>
 
-        <div className="flex items-center gap-1.5">
-          <button
-            onClick={toggle}
-            className="w-9 h-9 flex items-center justify-center rounded-full text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]/60 transition-colors"
-            aria-label={mounted ? `Switch to ${theme === 'dark' ? 'light' : 'dark'} mode` : 'Toggle theme'}
-            type="button"
-          >
-            {mounted && theme === 'dark' ? (
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="12" cy="12" r="4" />
-                <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41" />
+          <Link className="nav__logo" href="/" aria-label="ResearchArchive home">
+            <span className="mark" aria-hidden="true">
+              R
+            </span>
+            ResearchArchive
+          </Link>
+
+          <div className="nav__actions">
+            <button
+              type="button"
+              onClick={toggle}
+              className="icon-btn"
+              aria-label={
+                mounted ? `Switch to ${theme === 'dark' ? 'light' : 'dark'} theme` : 'Switch theme'
+              }
+            >
+              {mounted && theme === 'dark' ? (
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <circle cx="12" cy="12" r="4" />
+                  <path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M6.3 17.7l-1.4 1.4M19.1 4.9l-1.4 1.4" />
+                </svg>
+              ) : (
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z" />
+                </svg>
+              )}
+            </button>
+
+            <Link className="btn btn--primary nav__cta" href="/search">
+              Search papers
+            </Link>
+
+            <button
+              type="button"
+              className="nav__toggle"
+              onClick={() => setOpenPath(isOpen ? null : pathname)}
+              aria-expanded={isOpen}
+              aria-controls="nav-sheet"
+              aria-label={isOpen ? 'Close menu' : 'Open menu'}
+            >
+              <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" aria-hidden="true">
+                {isOpen ? <path d="M4 4l10 10M14 4L4 14" /> : <path d="M2 5h14M2 13h14" />}
               </svg>
-            ) : (
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
-              </svg>
-            )}
-          </button>
-
-          <button
-            onClick={() => setIsMobileOpen(v => !v)}
-            className="md:hidden w-9 h-9 flex items-center justify-center rounded-full text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]/60 transition-colors"
-            aria-label={isMobileOpen ? 'Close menu' : 'Open menu'}
-            aria-expanded={isMobileOpen}
-            type="button"
-          >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-              {isMobileOpen ? <path d="M18 6L6 18M6 6l12 12" /> : <path d="M4 8h16M4 16h16" />}
-            </svg>
-          </button>
-        </div>
-      </nav>
-
-      {isMobileOpen && (
-        <div className="md:hidden border-t border-[var(--border-primary)] bg-[var(--bg-primary)] animate-fade">
-          <div className="container-app py-2 flex flex-col">
-            {NAV_LINKS.map(link => {
-              const active = isActive(pathname, link.href);
-              return (
-                <Link
-                  key={link.href}
-                  href={link.href}
-                  onClick={() => setIsMobileOpen(false)}
-                  className={`px-3 py-2.5 rounded-md text-[14px] font-medium transition-colors ${
-                    active
-                      ? 'text-[var(--text-primary)] bg-[var(--bg-tertiary)]'
-                      : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]'
-                  }`}
-                >
-                  {link.label}
-                </Link>
-              );
-            })}
+            </button>
           </div>
         </div>
-      )}
-    </header>
+      </header>
+
+      <div id="nav-sheet" className={`nav__sheet${isOpen ? ' is-open' : ''}`}>
+        <div className="wrap">
+          {NAV_LINKS.map(link => (
+            <Link key={link.href} href={link.href} onClick={() => setOpenPath(null)}>
+              {link.label}
+            </Link>
+          ))}
+          <Link className="btn btn--primary" href="/search" onClick={() => setOpenPath(null)} style={{ width: '100%', marginTop: 24 }}>
+            Search papers
+          </Link>
+        </div>
+      </div>
+    </>
   );
 }

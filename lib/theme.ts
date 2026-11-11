@@ -6,6 +6,9 @@ export type Theme = 'light' | 'dark';
 
 const STORAGE_KEY = 'theme';
 const EVENT_NAME = 'research-archive:theme-change';
+const subscribeMounted = () => () => {};
+const clientMounted = () => true;
+const serverMounted = () => false;
 
 export function applyTheme(theme: Theme): void {
   if (typeof document === 'undefined') return;
@@ -50,7 +53,7 @@ export function useTheme() {
     () => 'light' as Theme
   );
 
-  const mounted = typeof window !== 'undefined';
+  const mounted = useSyncExternalStore(subscribeMounted, clientMounted, serverMounted);
 
   const setTheme = useCallback((next: Theme) => {
     applyTheme(next);

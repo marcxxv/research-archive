@@ -8,7 +8,7 @@ them through a fast, beautiful, accessible interface — built for students, res
 anyone curious about peer-reviewed work.
 
 - 🔎 **One search across 260M+ papers** — not just arXiv, not just PubMed.
-- 📥 **Local library** — bookmark papers; no account, no cloud, no tracking.
+- 📥 **Local library** — bookmark papers; no account; saved papers stay in your browser.
 - 📑 **Instant citations** in BibTeX, APA, MLA, and RIS.
 - ⚡ **Autocomplete + trending** powered by OpenAlex.
 - 🌙 **Dark mode**, keyboard shortcuts (`⌘K`, `/`, `↵`, arrows), and a polished UI.
@@ -23,7 +23,7 @@ anyone curious about peer-reviewed work.
   discipline — every filter is reflected in the URL so results are shareable.
 - **Paper detail pages** with abstracts, related papers, and "cited by" listings.
 - **Local library** with import/export (BibTeX, RIS, APA, MLA, JSON).
-- **Privacy by design** — no accounts, no analytics that follow you, your library stays in your
+- **Privacy by design** — no accounts, saved papers stay in your
   browser.
 - **Fully responsive** with dark mode and `prefers-reduced-motion` support.
 
@@ -31,7 +31,7 @@ anyone curious about peer-reviewed work.
 
 - **Framework**: Next.js 16 (App Router)
 - **Language**: TypeScript (strict)
-- **Styling**: Tailwind CSS 4 + CSS custom properties
+- **Styling**: Plain CSS with shared custom properties
 - **Validation**: Zod 4
 - **HTTP**: Axios with retry/backoff and a polite User-Agent
 - **XML**: fast-xml-parser (arXiv Atom & PubMed XML)
@@ -173,3 +173,9 @@ open-science community keeping research accessible.
 ---
 
 Built with care for everyone who reads research.
+
+## Interface redesign — 2026-11-11
+
+The taste-skill direction uses Chivo, white/charcoal surfaces and blue actions across the homepage, search, paper details, library and error states. Results use a shared list layout; filters, citations, navigation and exports share one control system. Homepage records are explicitly illustrative; citation tabs and copying use the real citation component. Sections grow with their content, including on small screens and with enlarged text. Library import is available before saving a first paper.
+
+Vercel Analytics is enabled only in Vercel environments. Saved papers remain in local browser storage; there is no account or library synchronization.

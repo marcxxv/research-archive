@@ -1,128 +1,30 @@
-# ResearchArchive Design System
+# ResearchArchive interface
 
-A reference for the visual language, interaction patterns, and component conventions used across
-ResearchArchive. The system is intentionally restrained: every page should feel quiet, fast, and
-purposeful, so the research gets the spotlight.
+Updated 2026-11-11. The executable design source is `app/globals.css`; components use its shared classes and tokens directly.
 
-## Principles
+## Direction
 
-1. **Reading first.** Every layout and color decision serves legibility.
-2. **Quiet motion.** Animations exist to clarify state, not to entertain. They respect
-   `prefers-reduced-motion`.
-3. **Theme via tokens.** Light/dark mode flips a single set of CSS variables. We do not use
-   Tailwind's `dark:` modifiers.
-4. **Predictable interactions.** URL is source of truth for search state. Saved library is the
-   source of truth for the bookmark badge.
-5. **Accessibility is non-negotiable.** Focus rings, contrast, ARIA on icon-only buttons, full
-   keyboard support.
+Chivo for reading and display, Chivo Mono for literal citation code; white and charcoal surfaces with blue actions. The homepage explains one merged search across four catalogs using illustrative paper records, then offers a working citation example and discipline links. Product pages use the same type, controls and spacing without repeating the homepage pitch.
 
-## Tokens (`app/globals.css`)
+## Tokens and components
 
-| Group | Tokens |
-|---|---|
-| Surfaces | `--bg-primary`, `--bg-secondary`, `--bg-tertiary`, `--bg-elevated`, `--bg-inset`, `--bg-overlay` |
-| Text | `--text-primary`, `--text-secondary`, `--text-tertiary`, `--text-placeholder`, `--text-on-accent` |
-| Borders | `--border-primary`, `--border-secondary` |
-| Brand | `--accent` (HSL), `--accent-foreground` |
-| Semantic | `--success`, `--warning`, `--error`, `--info` |
-| Shadows | `--shadow-sm`, `--shadow-md`, `--shadow-lg`, `--shadow-xl`, `--shadow-focus` |
-| Radii | `--radius-sm` (6) → `--radius-xl` (20), `--radius-full` |
-| Motion | `--duration-fast` (120ms), `--duration-normal` (200ms), `--duration-slow` (400ms) |
+- Surfaces: `--bg`, `--surface`, `--card`; text: `--ink`, `--muted`.
+- Actions: `--accent`, `--action`, `--action-ink`.
+- Spacing: `--s-1` through `--s-10`; radii: `--r-sm`, `--r-md`, `--r-lg`, `--r-btn`.
+- Type: `.t-h1`, `.t-h2`, `.t-h3`, `.t-lead`, `.t-small`, `.t-mono`.
+- Controls: `.btn` with `--primary`, `--secondary`, `--ghost` and size modifiers; `.icon-btn`, `.chip`, `.input`.
+- Results: `.result`, `.result__title`, `.result__foot`; citation controls: `.cite`; filtering: `.filters` and `.facet`.
 
-Dark mode is activated by `[data-theme="dark"]` on `<html>`. The bootstrap script in
-`app/layout.tsx` sets it before paint to prevent flash.
+## Flow and accessibility
 
-## Typography
+Search state stays in the URL. A homepage GET form works before hydration; result-page searches preserve filters. Mobile filters expand inline. Paper records offer saving, citation formats, sharing and original-source links. The library supports import even when empty, validates records, deduplicates imports and exports standard citation files or JSON.
 
-- **Font**: Inter (loaded from Google Fonts, weights 400/500/600/700)
-- Hierarchy classes:
-  - `.text-display` for hero headlines (`-0.035em` letter-spacing, line-height 1.05)
-  - `.text-title` for section titles
-  - `.text-heading` for subsection titles
-  - `.text-label` for uppercase eyebrow text
+Theme selection persists in browser storage and is applied before paint. Keyboard focus remains visible, the skip link targets main content, autocomplete uses unique accessible IDs, and motion respects reduced-motion preferences. Content sections grow rather than clipping at a fixed viewport height.
 
-## Components
+## Honest examples
 
-### Header (`components/Header.tsx`)
-Floating nav with a centered pill-style menu (md+). Becomes opaque + blurred after 8 px of
-scroll. Contains the theme toggle and the mobile menu button.
+Homepage result lists are labeled examples. Displayed example counts are illustrative, not measured search speed or current coverage. Citation tabs use the same working component as actual paper pages; clipboard failures show a manual-copy instruction. Source API availability remains independent of this interface redesign.
 
-### SearchBar (`components/SearchBar.tsx`)
-Command-palette style input with:
-- Autocomplete via `/api/suggest` (debounced 220 ms)
-- `⌘K` / `/` keyboard shortcut to focus
-- Arrow-key navigation through suggestions
-- A clear button when there's a query
-- Subtle focus state using the accent color and `--shadow-focus`
+## Verification
 
-The bar **never** mutates the URL while typing — only on Enter or click — so the search page
-fetches once per intent.
-
-### PaperCard (`components/PaperCard.tsx`)
-Two variants:
-- `default`: full card with abstract preview, footer meta, and trailing read/PDF links.
-- `compact`: dense card used in trending grids and related/citing lists.
-
-Both share the same header (badges + share/cite/save icons), making the visual rhythm
-consistent across the app.
-
-### FilterSidebar (`components/FilterSidebar.tsx`)
-Controlled (no internal state for filter values). The host page passes `filters`, `onChange`,
-and `onReset`, so the URL always reflects the filter state. Has a collapsible mobile mode.
-
-### Citation (`components/Citation.tsx`)
-Inline format switcher (BibTeX, APA, MLA, RIS) computed entirely on the client via
-`formatCitation()` — no extra network round-trip when the user toggles a format.
-
-### Toast (`components/Toast.tsx`)
-`useToast()` returns `{ addToast, ToastContainer }`. Toasts stack bottom-right with a
-flex-column-reverse so the newest is closest to the cursor.
-
-### Loading (`components/Loading.tsx`)
-`PaperCardSkeleton`, `SearchResultsSkeleton`, `PaperDetailSkeleton`, and `Spinner`. Skeletons
-share the radius of their real counterparts.
-
-## Page Patterns
-
-### Homepage (`app/page.tsx`)
-Hero → Trending (real data via `/api/trending`) → Discipline browser → Feature trio → Source
-overview → CTA. Decorative elements are limited to a single accent glow and a faint grid.
-
-### Search (`app/search/page.tsx`)
-Single source of truth: the URL. Filters, query, and page number all live in the search
-parameters. `useEffect` watches them and dispatches one `AbortController`-aware fetch per
-change. Partial failures are surfaced inline in the results header.
-
-### Paper Detail (`app/paper/[id]/page.tsx`)
-Reading-first layout with breadcrumb, action bar (PDF / Save / Source / Share), abstract,
-keywords, an inline citation widget, and "Related" + "Cited by" grids when OpenAlex provides
-them. The sidebar shows authoritative metadata (citations, journal, DOI, PMID, arXiv ID, source).
-
-### Saved Library (`app/saved/page.tsx`)
-Search/filter your own library, export in any of the four citation formats or as JSON, and
-import a JSON dump back. Empty and zero-match states are handled distinctly.
-
-## Accessibility Checklist
-
-- All interactive elements have a visible focus ring (`:focus-visible`).
-- Icon-only buttons carry `aria-label` and `title`.
-- Stateful toggles use `aria-pressed` / `aria-expanded` / `aria-current`.
-- Pagination is wrapped in `<nav aria-label="Pagination">`.
-- Animations respect `prefers-reduced-motion`.
-- Color contrast is verified at AA in both themes.
-
-## What Changed in v2.0
-
-This major overhaul (April 2026) focused on consistency, working APIs, and shareable URLs:
-
-- New shared HTTP layer with retries and a polite User-Agent.
-- New `/api/suggest` (autocomplete) and `/api/trending` endpoints powered by OpenAlex.
-- PubMed citation counts now come from NIH ICite, and PubDate parsing is hardened.
-- Discipline filter is now actually applied to the upstream query.
-- Search page no longer double-fetches on filter change; URL is the source of truth.
-- Cross-source deduplication merges metadata instead of overwriting it.
-- Citation formatter gains RIS export. Saved library can import/export JSON, BibTeX, RIS, APA,
-  MLA.
-- Theme system unified into `lib/theme.ts` and a single bootstrap script in `layout.tsx`.
-- Toast stacking is correct, skeletons match real card geometry, and decorative cursor/particle
-  animations were removed for performance.
+Before publication run `npm run lint` and `npm run build`, then inspect the homepage, search states, paper details, library and 404 at desktop, tablet and phone widths in both themes. Check actual search separately from controlled interface fixtures.

@@ -16,42 +16,18 @@ interface ToastProps {
   duration?: number;
 }
 
-function ToastNode({ toast, onClose, duration = 3500 }: ToastProps) {
-  const [visible, setVisible] = useState(false);
-
+function ToastNode({ toast, onClose, duration = 3200 }: ToastProps) {
   useEffect(() => {
-    const enter = setTimeout(() => setVisible(true), 10);
-    const exit = setTimeout(() => setVisible(false), duration);
-    const remove = setTimeout(() => onClose(toast.id), duration + 200);
-    return () => {
-      clearTimeout(enter);
-      clearTimeout(exit);
-      clearTimeout(remove);
-    };
+    const exit = setTimeout(() => onClose(toast.id), duration);
+    return () => clearTimeout(exit);
   }, [duration, onClose, toast.id]);
 
-  const colors = {
-    success: 'bg-[var(--success)] border-[var(--success)]',
-    error: 'bg-[var(--error)] border-[var(--error)]',
-    info: 'bg-[var(--text-primary)] border-[var(--text-primary)]',
-  }[toast.type];
-
   return (
-    <div
-      role="status"
-      className={`flex items-center gap-2.5 px-4 py-2.5 rounded-[var(--radius-md)] shadow-[var(--shadow-lg)] text-white text-[13px] font-medium transition-all duration-200 border ${colors} ${
-        visible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2'
-      }`}
-    >
+    <div className={`toast toast--${toast.type}`} role="status">
       <span>{toast.message}</span>
-      <button
-        type="button"
-        onClick={() => onClose(toast.id)}
-        className="ml-1 opacity-70 hover:opacity-100 transition-opacity"
-        aria-label="Dismiss"
-      >
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M18 6L6 18M6 6l12 12" />
+      <button type="button" onClick={() => onClose(toast.id)} aria-label="Dismiss">
+        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">
+          <path d="M2 2l8 8M10 2l-8 8" />
         </svg>
       </button>
     </div>
@@ -67,16 +43,14 @@ export function useToast() {
 
   const addToast = useCallback((message: string, type: ToastType = 'info') => {
     const id = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-    setToasts(prev => [...prev, { id, message, type }]);
+    setToasts(prev => [...prev.slice(-2), { id, message, type }]);
   }, []);
 
   const ToastContainer = useCallback(
     () => (
-      <div className="fixed bottom-4 right-4 z-50 flex flex-col-reverse gap-2 pointer-events-none">
+      <div className="toasts" aria-live="polite">
         {toasts.map(toast => (
-          <div key={toast.id} className="pointer-events-auto">
-            <ToastNode toast={toast} onClose={removeToast} />
-          </div>
+          <ToastNode key={toast.id} toast={toast} onClose={removeToast} />
         ))}
       </div>
     ),

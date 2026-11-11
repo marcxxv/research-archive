@@ -1,43 +1,8 @@
-import { type ClassValue, clsx } from 'clsx';
-
-export function cn(...inputs: ClassValue[]): string {
-  return clsx(inputs);
-}
-
 export function formatDate(dateString: string): string {
   if (!dateString) return '';
   const date = new Date(dateString);
   if (Number.isNaN(date.getTime())) return dateString;
   return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
-}
-
-export function formatRelativeDate(dateString: string): string {
-  if (!dateString) return '';
-  const date = new Date(dateString);
-  if (Number.isNaN(date.getTime())) return dateString;
-  const diffSec = (Date.now() - date.getTime()) / 1000;
-  const rtf = new Intl.RelativeTimeFormat('en', { numeric: 'auto' });
-  const buckets: [number, Intl.RelativeTimeFormatUnit][] = [
-    [60, 'second'],
-    [3600, 'minute'],
-    [86400, 'hour'],
-    [86400 * 7, 'day'],
-    [86400 * 30, 'week'],
-    [86400 * 365, 'month'],
-    [Number.POSITIVE_INFINITY, 'year'],
-  ];
-  let value = diffSec;
-  let unit: Intl.RelativeTimeFormatUnit = 'second';
-  let prev = 1;
-  for (const [limit, candidate] of buckets) {
-    if (Math.abs(diffSec) < limit) {
-      value = diffSec / prev;
-      unit = candidate;
-      break;
-    }
-    prev = limit;
-  }
-  return rtf.format(-Math.round(value), unit);
 }
 
 export function formatNumber(num: number): string {
@@ -51,10 +16,6 @@ export function truncateText(text: string, maxLength: number): string {
   if (!text) return '';
   if (text.length <= maxLength) return text;
   return text.slice(0, maxLength).trim() + '…';
-}
-
-export function normalizeQuery(query: string): string {
-  return query.trim().toLowerCase().replace(/\s+/g, ' ');
 }
 
 export function generatePaperId(source: string, externalId: string): string {
@@ -97,20 +58,6 @@ export function debounce<T extends (...args: Parameters<T>) => void>(
   return debounced;
 }
 
-export function isValidUrl(url: string): boolean {
-  try {
-    new URL(url);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-export function getDoiUrl(doi: string): string {
-  const cleanDoi = doi.replace(/^https?:\/\/(dx\.)?doi\.org\//, '');
-  return `https://doi.org/${cleanDoi}`;
-}
-
 export function cleanHtml(html: string): string {
   if (!html) return '';
   return html
@@ -125,17 +72,4 @@ export function cleanHtml(html: string): string {
     .replace(/&#39;/g, "'")
     .replace(/\s+/g, ' ')
     .trim();
-}
-
-export function calculateReadingTime(text: string): number {
-  if (!text) return 0;
-  const wordsPerMinute = 220;
-  const wordCount = text.trim().split(/\s+/).length;
-  return Math.max(1, Math.ceil(wordCount / wordsPerMinute));
-}
-
-export function bestPaperLink(paper: { url?: string; pdfUrl?: string; externalIds: { doi?: string } }): string {
-  if (paper.pdfUrl) return paper.pdfUrl;
-  if (paper.externalIds.doi) return getDoiUrl(paper.externalIds.doi);
-  return paper.url || '#';
 }

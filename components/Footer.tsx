@@ -1,10 +1,7 @@
-import Link from 'next/link';
+'use client';
 
-const PRODUCT_LINKS = [
-  { label: 'Search', href: '/search' },
-  { label: 'Library', href: '/saved' },
-  { label: 'API Status', href: '/api/health' },
-];
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 
 const SOURCE_LINKS = [
   { label: 'arXiv', href: 'https://arxiv.org' },
@@ -13,103 +10,118 @@ const SOURCE_LINKS = [
   { label: 'OpenAlex', href: 'https://openalex.org' },
 ];
 
-const RESOURCE_LINKS = [
-  { label: 'Open Access', href: 'https://en.wikipedia.org/wiki/Open_access' },
-  { label: 'DOI System', href: 'https://www.doi.org' },
+const PRODUCT_LINKS = [
+  { label: 'Search papers', href: '/search' },
+  { label: 'Your library', href: '/saved' },
+  { label: 'Source status', href: '/api/health' },
 ];
 
 export default function Footer() {
+  const pathname = usePathname();
   const year = new Date().getFullYear();
+  const isHome = pathname === '/';
+
+  if (!isHome) {
+    return (
+      <footer className="footer footer--compact">
+        <div className="wrap footer__bar">
+          <Link href="/" className="nav__logo" aria-label="ResearchArchive home">
+            <span className="mark" aria-hidden="true">
+              R
+            </span>
+            ResearchArchive
+          </Link>
+          <div className="footer__cols">
+            <div className="footer__col">
+              <ul>
+                {SOURCE_LINKS.map(item => (
+                  <li key={item.label}>
+                    <a href={item.href} target="_blank" rel="noopener noreferrer">
+                      {item.label}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+          <p className="footer__legal footer__legal--row">
+            <span>&copy; {year} ResearchArchive</span>
+            <span>Data via four open scholarly catalogs.</span>
+          </p>
+        </div>
+      </footer>
+    );
+  }
 
   return (
-    <footer className="border-t border-[var(--border-secondary)] bg-[var(--bg-primary)] mt-auto">
-      <div className="container-app py-14">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-10 md:gap-8 mb-12">
-          <div className="col-span-2">
-            <Link href="/" className="inline-flex items-center gap-2.5 mb-3">
-              <div className="w-7 h-7 rounded-[8px] bg-[var(--text-primary)] text-[var(--bg-primary)] flex items-center justify-center">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <circle cx="11" cy="11" r="8" />
-                  <path d="m21 21-4.35-4.35" />
-                </svg>
-              </div>
-              <span className="text-[15px] font-semibold tracking-tight text-[var(--text-primary)]">
-                ResearchArchive
-              </span>
-            </Link>
-            <p className="text-[13.5px] text-[var(--text-secondary)] leading-relaxed max-w-sm">
-              An open, fast, privacy-first search across 260M+ academic papers. Built for students,
-              researchers, and curious minds—free forever, with no accounts and no tracking.
+    <footer className="footer closing" aria-labelledby="close-h">
+      <div className="wrap">
+        <div className="closing__cta">
+          <div>
+            <h2 id="close-h" className="t-h2">
+              Start with a search
+            </h2>
+            <p>
+              Type a topic, an author or a DOI. Four catalogs answer at once and you get one list
+              back.
             </p>
           </div>
-
-          <FooterCol title="Product" items={PRODUCT_LINKS} />
-          <FooterCol title="Sources" items={SOURCE_LINKS} external />
+          <Link className="btn btn--primary" href="/search">
+            Search papers
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M1 6h8" />
+              <path d="M4.5 2.5 8 6l-3.5 3.5" />
+            </svg>
+          </Link>
         </div>
 
-        <div className="pt-6 border-t border-[var(--border-secondary)] flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
-          <div className="text-[12.5px] text-[var(--text-tertiary)]">
-            © {year} ResearchArchive · Data via {SOURCE_LINKS.map(s => s.label).join(', ')}
+        <div className="closing__links">
+          <div className="closing__cols">
+            <div className="closing__brand">
+              <Link href="/" className="nav__logo" aria-label="ResearchArchive home">
+                <span className="mark" aria-hidden="true">
+                  R
+                </span>
+                ResearchArchive
+              </Link>
+              <p>
+                Academic search across 260M papers. Free, no account, and your library stays in this
+                browser.
+              </p>
+            </div>
+
+            <div className="footer__cols">
+              <div className="footer__col">
+                <h3>Archive</h3>
+                <ul>
+                  {PRODUCT_LINKS.map(item => (
+                    <li key={item.label}>
+                      <Link href={item.href}>{item.label}</Link>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              <div className="footer__col">
+                <h3>Sources</h3>
+                <ul>
+                  {SOURCE_LINKS.map(item => (
+                    <li key={item.label}>
+                      <a href={item.href} target="_blank" rel="noopener noreferrer">
+                        {item.label}
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
           </div>
-          <div className="flex items-center gap-4">
-            {RESOURCE_LINKS.map(item => (
-              <a
-                key={item.label}
-                href={item.href}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-[12.5px] text-[var(--text-tertiary)] hover:text-[var(--text-primary)] transition-colors"
-              >
-                {item.label}
-              </a>
-            ))}
+
+          <div className="footer__legal">
+            <span>&copy; {year} ResearchArchive</span>
+            <span>MIT licensed. No accounts, no tracking.</span>
           </div>
         </div>
       </div>
     </footer>
-  );
-}
-
-function FooterCol({
-  title,
-  items,
-  external = false,
-}: {
-  title: string;
-  items: { label: string; href: string }[];
-  external?: boolean;
-}) {
-  return (
-    <div>
-      <h3 className="text-[12.5px] font-semibold text-[var(--text-primary)] mb-3 tracking-tight uppercase letter-spacing-wide">
-        {title}
-      </h3>
-      <ul className="space-y-2">
-        {items.map(item => (
-          <li key={item.label}>
-            {external ? (
-              <a
-                href={item.href}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-[13.5px] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors inline-flex items-center gap-1"
-              >
-                {item.label}
-                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="opacity-60">
-                  <path d="M7 17l9.2-9.2M17 17V7H7" />
-                </svg>
-              </a>
-            ) : (
-              <Link
-                href={item.href}
-                className="text-[13.5px] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
-              >
-                {item.label}
-              </Link>
-            )}
-          </li>
-        ))}
-      </ul>
-    </div>
   );
 }

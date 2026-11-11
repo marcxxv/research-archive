@@ -9,7 +9,13 @@ import Pagination from '@/components/Pagination';
 import { SearchResultsSkeleton } from '@/components/Loading';
 import { useToast } from '@/components/Toast';
 import { toggleSavedPaper, useSavedIds } from '@/lib/saved-papers';
-import type { Paper, PaperSource, SearchResult } from '@/lib/types';
+import type { Paper, PaperSource, SearchResult, SortOption } from '@/lib/types';
+
+const SORTS: { value: SortOption; label: string }[] = [
+  { value: 'relevance', label: 'Relevance' },
+  { value: 'date', label: 'Newest' },
+  { value: 'citations', label: 'Cited' },
+];
 
 function getDateRange(range: FilterState['dateRange']): { from: string; to: string } | undefined {
   if (range === 'all') return undefined;
@@ -20,7 +26,6 @@ function getDateRange(range: FilterState['dateRange']): { from: string; to: stri
     case 'week': fromMs = now.getTime() - 7 * 86400000; break;
     case 'month': fromMs = now.getTime() - 30 * 86400000; break;
     case 'year': fromMs = now.getTime() - 365 * 86400000; break;
-    default: return undefined;
   }
   return { from: new Date(fromMs).toISOString().split('T')[0], to };
 }
@@ -33,7 +38,7 @@ function paramsToFilters(sp: URLSearchParams): FilterState {
     dateRange: (sp.get('range') as FilterState['dateRange']) || defaultFilters.dateRange,
     citationMin: parseInt(sp.get('citationMin') || '0', 10) || 0,
     discipline: sp.get('discipline') || '',
-    sort: (sp.get('sort') as FilterState['sort']) || defaultFilters.sort,
+    sort: (sp.get('sort') as SortOption) || defaultFilters.sort,
   };
 }
 
@@ -81,7 +86,6 @@ function SearchContent() {
     let cancelled = false;
     const controller = new AbortController();
 
-    // Defer the synchronous state-update to a microtask so React can batch with the fetch
     Promise.resolve().then(() => {
       if (cancelled) return;
       setIsLoading(true);
@@ -153,51 +157,70 @@ function SearchContent() {
   const showInitialSkeleton = isLoading && !results;
 
   return (
-    <div className="container-app pt-24 pb-16">
-      <div className="max-w-3xl mx-auto mb-10">
-        <SearchBar initialQuery={query} onSearch={handleSearch} large placeholder="Search papers, authors, or topics…" />
-      </div>
+    <div className="page">
+      <div className="wrap">
+        <h1 className="sr-only">Search papers</h1>
 
-      <div className="flex flex-col lg:flex-row gap-6 lg:gap-8">
-        <FilterSidebar filters={filters} onChange={handleFilterChange} onReset={handleResetFilters} />
+        <div className="search-top">
+          <SearchBar
+            initialQuery={query}
+            onSearch={handleSearch}
+            size="lg"
+            submitLabel="Search papers"
+            placeholder="Topic, author or DOI"
+          />
+        </div>
 
-        <div className="flex-1 min-w-0">
-          {results && !showInitialSkeleton && (
-            <div className="flex items-center justify-between flex-wrap gap-3 mb-6 pb-4 border-b border-[var(--border-secondary)]">
-              <div>
-                <p className="text-[13px] text-[var(--text-secondary)]">
-                  <span className="font-semibold text-[var(--text-primary)]">{results.total.toLocaleString()}</span>
-                  {' '}results for{' '}
-                  <span className="font-semibold text-[var(--text-primary)]">&ldquo;{query}&rdquo;</span>
-                  <span className="text-[var(--text-tertiary)]"> · {results.searchTimeMs} ms</span>
-                </p>
-                {results.errors && results.errors.length > 0 && (
-                  <p className="text-[12px] text-[var(--warning)] mt-1">
-                    Partial results: {results.errors.map(e => e.source).join(', ')} unavailable
-                  </p>
+        <div className="results-grid">
+          <FilterSidebar filters={filters} onChange={handleFilterChange} onReset={handleResetFilters} />
+
+          <div className="results-main">
+            <div className="toolbar">
+              <p className="toolbar__count" aria-live="polite">
+                {results && !showInitialSkeleton ? (
+                  <>
+                    <b>{results.total.toLocaleString()}</b> papers
+                    <span className="muted"> · {results.searchTimeMs} ms</span>
+                  </>
+                ) : (
+                  <span className="muted">{isLoading ? 'Searching selected databases…' : query ? 'No results loaded' : 'Ready to search'}</span>
                 )}
+              </p>
+
+              <div className="segmented" role="group" aria-label="Sort results">
+                {SORTS.map(opt => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    aria-pressed={filters.sort === opt.value}
+                    onClick={() => handleFilterChange({ ...filters, sort: opt.value })}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
               </div>
             </div>
-          )}
 
-          {error && (
-            <div className="p-4 mb-4 rounded-[var(--radius-md)] border border-[var(--error)]/30 bg-[var(--error)]/5">
-              <p className="text-[13px] text-[var(--error)] font-medium">{error}</p>
-            </div>
-          )}
+            {results?.errors && results.errors.length > 0 && (
+              <p className="t-small muted" style={{ marginTop: 12 }}>
+                Partial results: {results.errors.map(e => e.source).join(', ')} did not answer.
+              </p>
+            )}
 
-          <div className={`relative transition-opacity duration-200 ${isLoading && results ? 'opacity-60' : 'opacity-100'}`}>
-            {isLoading && results && (
-              <div className="absolute -top-1 left-0 right-0 h-0.5 overflow-hidden">
-                <div className="h-full bg-[hsl(var(--accent))] animate-loading-bar" />
+            {error && (
+              <div className="panel" style={{ marginTop: 24, borderColor: 'var(--line-strong)' }}>
+                <p className="t-small strong">{error}</p>
+                <p className="t-small muted" style={{ marginTop: 6 }}>
+                  Try again in a moment, or remove a filter.
+                </p>
               </div>
             )}
 
-            {showInitialSkeleton && <SearchResultsSkeleton count={5} />}
+            <div className={`results-list${isLoading && results ? ' is-loading' : ''}`}>
+              {showInitialSkeleton && <SearchResultsSkeleton count={6} />}
 
-            {!showInitialSkeleton && results && results.papers.length > 0 && (
-              <div className="space-y-4">
-                {results.papers.map(paper => (
+              {!showInitialSkeleton &&
+                results?.papers.map(paper => (
                   <PaperCard
                     key={paper.id}
                     paper={paper}
@@ -205,44 +228,42 @@ function SearchContent() {
                     isSaved={savedIds.has(paper.id)}
                   />
                 ))}
+            </div>
+
+            {!showInitialSkeleton && results && results.papers.length === 0 && (
+              <div className="empty">
+                <h2 className="t-h3">Nothing came back for &ldquo;{query}&rdquo;</h2>
+                <p className="t-small muted">
+                  Fewer filters, a broader phrase, or a check on the spelling usually fixes it. The
+                  indexes hold titles and abstracts, not full text.
+                </p>
+                {filters.sources.length < 4 || filters.accessType !== 'any' || filters.dateRange !== 'all' || filters.citationMin > 0 || filters.discipline ? (
+                  <button type="button" className="btn btn--secondary btn--sm" onClick={handleResetFilters}>
+                    Clear filters
+                  </button>
+                ) : null}
+              </div>
+            )}
+
+            {!query && !isLoading && (
+              <div className="empty">
+                <h2 className="t-h3">Type a topic, an author or a DOI</h2>
+                <p className="t-small muted">
+                  Or open a field from the homepage and refine it here.
+                </p>
+              </div>
+            )}
+
+            {results && results.pages > 1 && (
+              <div className="results-pager">
+                <Pagination
+                  currentPage={page}
+                  totalPages={Math.min(results.pages, 50)}
+                  onPageChange={handlePageChange}
+                />
               </div>
             )}
           </div>
-
-          {!showInitialSkeleton && results && results.papers.length === 0 && (
-            <div className="text-center py-20">
-              <div className="w-12 h-12 mx-auto mb-3 rounded-full bg-[var(--bg-tertiary)] flex items-center justify-center text-[var(--text-tertiary)]">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                  <circle cx="11" cy="11" r="8" />
-                  <path d="m21 21-4.35-4.35" />
-                </svg>
-              </div>
-              <h3 className="text-heading text-[16px] mb-1">No results found</h3>
-              <p className="text-[13.5px] text-[var(--text-tertiary)] max-w-sm mx-auto">
-                Try broader keywords, fewer filters, or check spelling. The full-text isn&apos;t indexed,
-                so describe what the paper is about, not its title.
-              </p>
-            </div>
-          )}
-
-          {!query && !isLoading && (
-            <div className="text-center py-24">
-              <h3 className="text-heading text-[18px] mb-2">Begin your discovery</h3>
-              <p className="text-[14px] text-[var(--text-tertiary)]">
-                Type a query above or pick a discipline from the homepage.
-              </p>
-            </div>
-          )}
-
-          {results && results.pages > 1 && (
-            <div className="mt-10 flex justify-center">
-              <Pagination
-                currentPage={page}
-                totalPages={Math.min(results.pages, 50)}
-                onPageChange={handlePageChange}
-              />
-            </div>
-          )}
         </div>
       </div>
 
@@ -253,7 +274,15 @@ function SearchContent() {
 
 export default function SearchPage() {
   return (
-    <Suspense fallback={<div className="container-app pt-24 pb-16"><SearchResultsSkeleton count={5} /></div>}>
+    <Suspense
+      fallback={
+        <div className="page">
+          <div className="wrap">
+            <SearchResultsSkeleton count={6} />
+          </div>
+        </div>
+      }
+    >
       <SearchContent />
     </Suspense>
   );

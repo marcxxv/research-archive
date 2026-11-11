@@ -13,12 +13,12 @@ deduplication, instant citations (BibTeX, APA, MLA, RIS), and a local-only saved
 **Highlights:**
 - **Framework**: Next.js 16 (App Router) on React 19
 - **Language**: TypeScript (strict)
-- **Styling**: Tailwind CSS v4 with CSS custom properties (light + dark themes)
+- **Styling**: Plain CSS with shared custom properties (light + dark themes)
 - **Validation**: Zod schemas for every external surface
 - **Privacy**: No accounts. No tracking. Library lives in `localStorage`.
 
-**Repository**: `mnco25/research-archive`
-**Active branch**: `claude/system-overhaul-modernize-8hGTT`
+**Repository**: `marcxxv/research-archive`
+**Branch**: verify with `git branch --show-current`
 
 ## Repository Structure
 
@@ -39,7 +39,7 @@ research-archive/
 │   ├── paper/[id]/page.tsx     # Paper detail (abstract, related, citations)
 │   └── saved/page.tsx          # Local library with import/export
 ├── components/
-│   ├── Header.tsx              # Floating, scroll-aware header w/ theme toggle
+│   ├── Header.tsx              # Shared navigation, mobile menu and theme toggle
 │   ├── SearchBar.tsx           # Command-palette search w/ /api/suggest
 │   ├── PaperCard.tsx           # Card variant: default | compact
 │   ├── FilterSidebar.tsx       # URL-driven controlled filter sidebar
@@ -70,7 +70,6 @@ research-archive/
 ├── package.json
 ├── tsconfig.json
 ├── next.config.ts
-├── postcss.config.mjs
 ├── eslint.config.mjs
 ├── .env.example                # Environment variable template
 └── README.md
@@ -81,7 +80,7 @@ research-archive/
 - **Next.js 16** with the App Router (server-side route handlers, no Pages Router)
 - **React 19** for UI
 - **TypeScript 5** with `strict: true`
-- **Tailwind CSS 4** via `@tailwindcss/postcss`
+- **Plain CSS** in `app/globals.css`
 - **Zod 4** for runtime validation of all API surface
 - **Axios 1** for HTTP, wrapped by `lib/http.ts` (single User-Agent + retry policy)
 - **fast-xml-parser** for arXiv (Atom) and PubMed (XML)
@@ -153,7 +152,7 @@ write so the UI can stay in sync across pages.
 
 ```bash
 # Setup
-git clone https://github.com/mnco25/research-archive.git
+git clone https://github.com/marcxxv/research-archive.git
 cd research-archive
 npm install
 cp .env.example .env.local
@@ -262,24 +261,7 @@ Health probe for all four upstream APIs. Aggregates to `healthy | degraded | unh
 
 ## Design System
 
-`app/globals.css` defines the entire token set:
-
-- **Surfaces**: `--bg-primary`, `--bg-secondary`, `--bg-tertiary`, `--bg-elevated`, `--bg-inset`
-- **Text**: `--text-primary`, `--text-secondary`, `--text-tertiary`, `--text-placeholder`
-- **Borders**: `--border-primary`, `--border-secondary`
-- **Brand**: `--accent` (HSL), `--accent-foreground`
-- **Semantic**: `--success`, `--warning`, `--error`, `--info`
-
-Dark mode is driven by `[data-theme="dark"]` on `<html>`. The bootstrap script in `layout.tsx`
-sets it before paint.
-
-Typography:
-- `.text-display` (heroes), `.text-title` (section headlines), `.text-heading` (subsections),
-  `.text-label` (uppercase eyebrows)
-- Body uses Inter via Google Fonts.
-
-Reusable component classes: `.btn` (`btn-sm | btn-md | btn-lg`, `btn-primary | btn-secondary |
-btn-ghost | btn-accent`), `.badge` family, `.card`, `.input`, `.skeleton`.
+See [DESIGN_WALKTHROUGH.md](./DESIGN_WALKTHROUGH.md) for the current tokens, components and interaction conventions. `app/globals.css` is the executable source; use its shared classes rather than Tailwind utilities. Theme changes use `[data-theme="dark"]` on the root element.
 
 ## Quality Standards
 
@@ -326,6 +308,6 @@ Types: `feat`, `fix`, `refactor`, `style`, `docs`, `chore`, `perf`, `test`.
 
 ---
 
-**Last updated**: April 27, 2026
-**Active branch**: `claude/system-overhaul-modernize-8hGTT`
-**Status**: Production-ready · ESLint clean · Type-checked
+**Last updated**: November 11, 2026
+**Branch**: verify with `git branch --show-current`
+**Status**: verify current lint, build and browser results before release.

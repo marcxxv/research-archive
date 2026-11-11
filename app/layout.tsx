@@ -1,42 +1,71 @@
 import type { Metadata, Viewport } from 'next';
+import { Chivo, Chivo_Mono } from 'next/font/google';
 import './globals.css';
 import { Analytics } from '@vercel/analytics/next';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
+
+const chivo = Chivo({
+  subsets: ['latin'],
+  weight: ['400', '500', '600'],
+  variable: '--font-chivo',
+  display: 'swap',
+});
+
+const chivoMono = Chivo_Mono({
+  subsets: ['latin'],
+  weight: ['400', '500'],
+  variable: '--font-chivo-mono',
+  display: 'swap',
+});
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://research-archive.app';
 
 export const metadata: Metadata = {
   metadataBase: new URL(APP_URL),
   title: {
-    default: 'ResearchArchive — Find research that moves you forward',
+    default: 'ResearchArchive — Academic search across 260M papers',
     template: '%s · ResearchArchive',
   },
   description:
-    'A unified, free, privacy-first search across 260M+ academic papers from arXiv, PubMed, CrossRef, and OpenAlex. Built for students and researchers.',
-  keywords: ['academic search', 'research papers', 'arXiv', 'PubMed', 'CrossRef', 'OpenAlex', 'open access', 'citations'],
+    'One search box over arXiv, PubMed, CrossRef and OpenAlex. Results are merged on DOI and deduplicated. Free, no account, and your library stays in your browser.',
+  keywords: [
+    'academic search',
+    'research papers',
+    'arXiv',
+    'PubMed',
+    'CrossRef',
+    'OpenAlex',
+    'open access',
+    'citations',
+  ],
   authors: [{ name: 'ResearchArchive' }],
   openGraph: {
-    title: 'ResearchArchive — Academic search, simplified',
+    title: 'ResearchArchive — Academic search across 260M papers',
     description:
-      'Search 260M+ papers across arXiv, PubMed, CrossRef, and OpenAlex. Free, fast, and privacy-first.',
+      'Search arXiv, PubMed, CrossRef and OpenAlex at once. One merged, deduplicated list. No account.',
     type: 'website',
     url: APP_URL,
   },
   twitter: {
     card: 'summary_large_image',
     title: 'ResearchArchive',
-    description: 'Search 260M+ academic papers across four scholarly databases.',
+    description: 'Academic search across 260M papers from four databases, merged into one list.',
   },
   robots: { index: true, follow: true },
+  other: {
+    'page-type': 'software',
+    'site-kind': 'software',
+  },
 };
 
 export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
+  viewportFit: 'cover',
   themeColor: [
     { media: '(prefers-color-scheme: light)', color: '#ffffff' },
-    { media: '(prefers-color-scheme: dark)', color: '#0a0a0a' },
+    { media: '(prefers-color-scheme: dark)', color: '#0e0e0f' },
   ],
 };
 
@@ -57,15 +86,22 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html
+      lang="en"
+      data-type="software"
+      data-radius="soft"
+      data-buttons="pill"
+      className={`${chivo.variable} ${chivoMono.variable}`}
+      suppressHydrationWarning
+    >
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeBootstrap }} />
       </head>
-      <body className="antialiased min-h-screen flex flex-col">
+      <body>
         <Header />
-        <main className="flex-1 pt-0">{children}</main>
+        <main id="main">{children}</main>
         <Footer />
-        <Analytics />
+        {process.env.VERCEL ? <Analytics /> : null}
       </body>
     </html>
   );

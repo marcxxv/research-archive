@@ -72,8 +72,10 @@ function getSnapshot(): SavedPaper[] {
   return list;
 }
 
+const EMPTY_SAVED: SavedPaper[] = [];
+
 function getServerSnapshot(): SavedPaper[] {
-  return [];
+  return EMPTY_SAVED;
 }
 
 function subscribeStore(callback: () => void): () => void {

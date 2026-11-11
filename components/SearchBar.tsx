@@ -1,35 +1,39 @@
 'use client';
 
-import { useState, useRef, useEffect, useMemo } from 'react';
+import { useState, useRef, useEffect, useMemo, useId } from 'react';
 import { useRouter } from 'next/navigation';
 import { debounce } from '@/lib/utils';
 import type { Suggestion } from '@/lib/types';
 
 interface SearchBarProps {
   initialQuery?: string;
-  large?: boolean;
   onSearch?: (query: string) => void;
   placeholder?: string;
   autoFocus?: boolean;
-  showShortcut?: boolean;
+  size?: 'md' | 'lg';
+  variant?: 'page' | 'bar';
+  showSubmit?: boolean;
+  submitLabel?: string;
 }
 
 export default function SearchBar({
   initialQuery = '',
-  large = false,
   onSearch,
-  placeholder = 'Search papers, authors, or topics…',
+  placeholder = 'Topic, author or DOI',
   autoFocus = false,
-  showShortcut = true,
+  size = 'md',
+  variant = 'page',
+  showSubmit = true,
+  submitLabel = 'Search',
 }: SearchBarProps) {
   const [query, setQuery] = useState(initialQuery);
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(-1);
-  const [isFocused, setIsFocused] = useState(false);
   const [lastInitial, setLastInitial] = useState(initialQuery);
   const router = useRouter();
+  const suggestionsId = useId();
   const inputRef = useRef<HTMLInputElement>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
   const requestIdRef = useRef(0);
@@ -43,7 +47,7 @@ export default function SearchBar({
     () =>
       debounce(async (value: string) => {
         const trimmed = value.trim();
-        if (trimmed.length < 2) {
+        if (trimmed.length < 3) {
           setSuggestions([]);
           setIsLoading(false);
           return;
@@ -54,9 +58,7 @@ export default function SearchBar({
           const res = await fetch(`/api/suggest?q=${encodeURIComponent(trimmed)}&limit=6`);
           if (!res.ok) throw new Error('failed');
           const data: { suggestions: Suggestion[] } = await res.json();
-          if (requestId === requestIdRef.current) {
-            setSuggestions(data.suggestions || []);
-          }
+          if (requestId === requestIdRef.current) setSuggestions(data.suggestions || []);
         } catch {
           if (requestId === requestIdRef.current) setSuggestions([]);
         } finally {
@@ -70,6 +72,8 @@ export default function SearchBar({
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
+    requestIdRef.current += 1;
+    setSuggestions([]);
     setQuery(value);
     setSelectedIndex(-1);
     setShowSuggestions(true);
@@ -86,6 +90,9 @@ export default function SearchBar({
   };
 
   const handleSubmit = (e: React.FormEvent) => {
+    // without an onSearch handler the form is a plain GET to /search?q=…, so it works before
+    // hydration and the browser owns the navigation
+    if (!onSearch) return;
     e.preventDefault();
     submit(query);
   };
@@ -116,7 +123,6 @@ export default function SearchBar({
     const onClickOutside = (event: MouseEvent) => {
       if (wrapperRef.current && !wrapperRef.current.contains(event.target as Node)) {
         setShowSuggestions(false);
-        setIsFocused(false);
       }
     };
     document.addEventListener('mousedown', onClickOutside);
@@ -131,7 +137,7 @@ export default function SearchBar({
         inputRef.current?.focus();
       }
       const tag = (document.activeElement?.tagName || '').toLowerCase();
-      if (e.key === '/' && tag !== 'input' && tag !== 'textarea') {
+      if (e.key === '/' && tag !== 'input' && tag !== 'textarea' && tag !== 'select') {
         e.preventDefault();
         inputRef.current?.focus();
       }
@@ -140,121 +146,112 @@ export default function SearchBar({
     return () => window.removeEventListener('keydown', onGlobalKey);
   }, [autoFocus]);
 
+  const hasPanel = showSuggestions && (suggestions.length > 0 || isLoading);
+
   return (
-    <div ref={wrapperRef} className="relative w-full">
-      <form onSubmit={handleSubmit} role="search">
-        <div
-          className={`relative flex items-center bg-[var(--bg-elevated)] border rounded-[var(--radius-lg)] transition-all duration-200 ${
-            isFocused
-              ? 'border-[hsl(var(--accent))] shadow-[var(--shadow-focus)]'
-              : 'border-[var(--border-primary)] hover:border-[var(--text-tertiary)]'
-          }`}
-        >
-          <div className={`pl-4 flex items-center justify-center transition-colors ${isFocused ? 'text-[hsl(var(--accent))]' : 'text-[var(--text-tertiary)]'}`}>
+    <div
+      ref={wrapperRef}
+      className={`search${variant === 'bar' ? ' search--bar' : ''}${size === 'lg' ? ' search--lg' : ''}`}
+    >
+      <form onSubmit={handleSubmit} action="/search" method="get" role="search">
+        <div className="search__box">
+          <span className="search__icon" aria-hidden="true">
             {isLoading ? (
-              <div className="w-5 h-5 border-2 border-[hsl(var(--accent))] border-t-transparent rounded-full animate-spin" />
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className="spin" aria-hidden="true">
+                <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="2" opacity="0.25" />
+                <path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+              </svg>
             ) : (
-              <svg width={large ? 20 : 18} height={large ? 20 : 18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="11" cy="11" r="8" />
-                <path d="m21 21-4.35-4.35" />
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <circle cx="11" cy="11" r="7.5" />
+                <path d="m20.5 20.5-4.3-4.3" />
               </svg>
             )}
-          </div>
+          </span>
 
           <input
             ref={inputRef}
             type="text"
+            name="q"
             value={query}
             onChange={handleChange}
             onFocus={() => {
-              setIsFocused(true);
-              if (query.trim().length >= 2 && suggestions.length > 0) setShowSuggestions(true);
+              if (query.trim().length >= 3 && suggestions.length > 0) setShowSuggestions(true);
             }}
             onKeyDown={handleKeyDown}
             placeholder={placeholder}
             autoComplete="off"
             spellCheck={false}
-            className={`flex-1 bg-transparent border-none outline-none font-medium text-[var(--text-primary)] placeholder:text-[var(--text-placeholder)] ${
-              large ? 'h-[58px] text-[16px] px-3' : 'h-[44px] text-[14px] px-3'
-            }`}
             aria-label="Search papers"
             aria-autocomplete="list"
             role="combobox"
-            aria-expanded={showSuggestions}
-            aria-controls="search-suggestions"
+            aria-expanded={hasPanel}
+            aria-controls={hasPanel ? suggestionsId : undefined}
+            aria-activedescendant={hasPanel && selectedIndex >= 0 ? `${suggestionsId}-${selectedIndex}` : undefined}
           />
 
           {query && (
             <button
               type="button"
               onClick={() => {
+                requestIdRef.current += 1;
+                fetchSuggestions.cancel();
+                setIsLoading(false);
+                setShowSuggestions(false);
                 setQuery('');
                 setSuggestions([]);
                 inputRef.current?.focus();
               }}
-              className="p-2 mr-1 rounded-full text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors"
+              className="search__clear"
               aria-label="Clear search"
             >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M18 6L6 18M6 6l12 12" />
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">
+                <path d="M2 2l8 8M10 2l-8 8" />
               </svg>
             </button>
           )}
 
-          {showShortcut && !query && (
-            <kbd className="hidden md:flex items-center gap-1 px-1.5 py-1 mr-3 rounded-md bg-[var(--bg-tertiary)] border border-[var(--border-primary)]/60 text-[10px] font-semibold text-[var(--text-tertiary)] select-none">
-              <span>⌘</span><span>K</span>
-            </kbd>
+          {showSubmit && variant === 'page' && (
+            <button type="submit" className="search__submit">
+              {submitLabel}
+            </button>
           )}
         </div>
       </form>
 
-      {showSuggestions && (suggestions.length > 0 || isLoading) && (
-        <div
-          id="search-suggestions"
-          className="absolute top-[calc(100%+8px)] left-0 right-0 bg-[var(--bg-elevated)] border border-[var(--border-primary)] rounded-[var(--radius-lg)] shadow-[var(--shadow-lg)] z-50 overflow-hidden"
-          role="listbox"
-        >
+      {hasPanel && (
+        <div id={suggestionsId} className="search__suggest" role="listbox">
           {isLoading && suggestions.length === 0 ? (
-            <div className="px-4 py-5 flex items-center justify-center gap-2 text-[var(--text-tertiary)]">
-              <div className="w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" />
-              <span className="text-[13px]">Searching…</span>
+            <div className="suggest-row">
+              <span>Looking through OpenAlex…</span>
             </div>
           ) : (
-            <ul className="py-1.5 max-h-[420px] overflow-y-auto">
+            <>
               {suggestions.map((suggestion, idx) => (
-                <li
+                <div
                   key={suggestion.id}
+                  id={`${suggestionsId}-${idx}`}
                   role="option"
                   aria-selected={idx === selectedIndex}
-                  className={`px-3 py-2.5 mx-1.5 rounded-[var(--radius-md)] cursor-pointer transition-colors ${
-                    idx === selectedIndex ? 'bg-[var(--bg-tertiary)]' : 'hover:bg-[var(--bg-secondary)]'
-                  }`}
+                  className="suggest-row"
                   onClick={() => handleSuggestionClick(suggestion)}
                   onMouseEnter={() => setSelectedIndex(idx)}
                 >
-                  <div className="font-medium text-[var(--text-primary)] text-[13.5px] leading-snug line-clamp-2">
-                    {suggestion.title}
-                  </div>
-                  {suggestion.hint && (
-                    <div className="text-[11.5px] text-[var(--text-tertiary)] mt-0.5 line-clamp-1">
-                      {suggestion.hint}
-                    </div>
-                  )}
-                </li>
+                  <b>{suggestion.title}</b>
+                  {suggestion.hint && <span>{suggestion.hint}</span>}
+                </div>
               ))}
-              <li
-                className="mx-1.5 mt-1 px-3 py-2.5 rounded-[var(--radius-md)] flex items-center justify-between cursor-pointer hover:bg-[var(--bg-tertiary)] transition-colors border-t border-[var(--border-secondary)]/60"
-                onClick={() => submit(query)}
+              <div
+                className="suggest-row"
                 role="option"
                 aria-selected={false}
+                onClick={() => submit(query)}
               >
-                <span className="text-[13px] font-medium text-[var(--text-primary)]">
-                  Search for &ldquo;{query}&rdquo;
-                </span>
-                <span className="text-[10.5px] font-semibold text-[var(--text-tertiary)] tracking-wider">↵ ENTER</span>
-              </li>
-            </ul>
+                <b>
+                  Search all four databases for <em>{query}</em>
+                </b>
+              </div>
+            </>
           )}
         </div>
       )}
